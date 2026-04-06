@@ -20,14 +20,14 @@ Viewtron IP Camera → HTTP POST (XML) → viewtron_bridge.py → MQTT → Home 
 
 ## Supported Detection Types
 
-| Detection | HA Entity | Data |
-|-----------|-----------|------|
-| **License Plate Recognition (LPR)** | `sensor.viewtron_*_plate` | Plate number, authorized/not authorized, vehicle brand/color/type |
-| **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Zone entry, exit, line crossing, loitering, intrusion detection |
+| Detection | HA Entity | Status |
+|-----------|-----------|--------|
+| **License Plate Recognition (LPR)** | `sensor.viewtron_*_plate` | **Tested and supported** — plate number, authorized/not authorized, vehicle brand/color/type |
+| **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Coming soon — zone entry, exit, line crossing, loitering, intrusion detection |
 | **Face Detection** | `binary_sensor.viewtron_*_face` | Coming soon — face recognition with NVR database |
-| **Object Counting** | `sensor.viewtron_*_counting` | People/vehicle count by line or area |
+| **Object Counting** | `sensor.viewtron_*_counting` | Coming soon — people/vehicle count by line or area |
 
-All entities auto-discover via MQTT — no manual YAML configuration.
+LPR is fully tested end-to-end with the Viewtron LPR-IP4 camera. The other detection types use the same bridge architecture and will be documented as testing is completed. All entities auto-discover via MQTT — no manual YAML configuration.
 
 ## Setup
 
