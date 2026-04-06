@@ -88,7 +88,7 @@ home_assistant:
 
 Once your Viewtron LPR camera or general purpose Viewtron AI camera is connected to your network, you may need to use the Viewtron IP installer tool to locate the camera on your network. You an [download IP installer tools for Mac and Windows on this page](https://www.cctvcamerapros.com/viewtron-software-apps-s/1482.htm).
 
-### 5. Configure HTTP Post on Your Camera
+### 5. Configure HTTP Post Server on Your Camera
 
 In the camera's web interface, configure the HTTP Post / Alarm Server to send events to the bridge:
 
@@ -98,7 +98,7 @@ In the camera's web interface, configure the HTTP Post / Alarm Server to send ev
 
 Setup guide: [IP Camera HTTP Post Configuration](https://videos.cctvcamerapros.com/support/topic/ip-camera-api-webbooks)
 
-### 5. Configure License Plate Recognition
+### 6. Configure License Plate Recognition
 
 Before the camera will send LPR events, you need to configure plate detection on the camera:
 
