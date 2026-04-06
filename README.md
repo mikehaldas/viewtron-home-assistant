@@ -90,9 +90,15 @@ If you need to locate the camera on your network, you can [download the Viewtron
 
 ![Locate IP camera on network](https://videos.cctvcamerapros.com/wp-content/files/IP-Camera-Login-1024x546.jpg)
 
+Log into the camera using its IP address in a web browser. Enter the camera's user ID and password, then login.
+
 ### 5. License Plate Detection Configuration
 
-Log into the camera using its IP address in a web browser. Navigate to the **Config** tab, then select **License Plate Detection**.
+![Configure LPR camera detection](https://videos.cctvcamerapros.com/wp-content/files/configure-LPR-Camera-1024x546.jpg)
+
+Navigate to the **Config** tab, then select **License Plate Detection**.
+
+![Enable license plate detection](https://videos.cctvcamerapros.com/wp-content/files/enable-license-plate-detection-1024x546.jpg)
 
 On the License Plate Detection screen:
 
@@ -103,15 +109,14 @@ On the License Plate Detection screen:
 
 The min sizes should be slightly smaller than the realistic size of a license plate. The max sizes should be slightly larger. These do not need to be exact — provide an adequate buffer rather than exact measurements. Click **Save** when done.
 
-![Configure LPR camera detection](https://videos.cctvcamerapros.com/wp-content/files/configure-LPR-Camera-1024x546.jpg)
-
-![Enable license plate detection](https://videos.cctvcamerapros.com/wp-content/files/enable-license-plate-detection-1024x546.jpg)
-
 **LPR installation best practices:**
+Here are some best practices when installing your LPR camera.
 - Mount the camera at a 15-30° angle to the vehicle path — avoid head-on or extreme side angles
 - Keep the plate within 20-90 ft of the camera (LPR-IP4 range)
 - Use the camera's motorized zoom to frame the plate area — plates should fill roughly 10-15% of the frame width
 - Night performance is built in (IR illumination + headlight compensation) — no additional lighting needed
+
+For more details, please refer to our complete [LPR Camera Installation Guide](https://videos.cctvcamerapros.com/v/anpr-lpr-camera-installation.html).
 
 ### 6. License Plate Database Setup (Optional)
 
