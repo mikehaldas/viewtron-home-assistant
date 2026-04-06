@@ -84,15 +84,24 @@ home_assistant:
     lpr: viewtron-lpr
     intrusion: viewtron-intrusion
 ```
-### 4. Setup the IP Camera on Your Network
+### 4. Locate Your IP Camera on Your Network
 
-Once your Viewtron LPR camera or general purpose Viewtron AI camera is connected to your network, you may need to use the Viewtron IP installer tool to locate the camera on your network. You can [download IP installer tools for Mac and Windows on this page](https://www.cctvcamerapros.com/viewtron-software-apps-s/1482.htm).
+If you need to locate the camera on your network, you can [download the Viewtron network IP installer tool here](https://www.cctvcamerapros.com/viewtron-software-apps-s/1482.htm). We have a Windows and Mac IP camera network finder / IP installer tool available for Viewtron IP cameras.
 
 ![Locate IP camera on network](https://videos.cctvcamerapros.com/wp-content/files/IP-Camera-Login-1024x546.jpg)
 
-### 5. Configure License Plate Detection
+### 5. License Plate Detection Configuration
 
-In the camera's web interface, go to **Config → License Plate Detection**. Enable detection, draw a detection zone covering the area where plates will be visible, and set the minimum/maximum plate size parameters. Leave adequate buffer margins around the expected plate area.
+Log into the camera using its IP address in a web browser. Navigate to the **Config** tab, then select **License Plate Detection**.
+
+On the License Plate Detection screen:
+
+1. Check **Enable**
+2. Click on the **Draw Area** button
+3. Draw the license plate detection zone
+4. Click on the **Draw Target Size** button, then enter the min and max sizes for plates
+
+The min sizes should be slightly smaller than the realistic size of a license plate. The max sizes should be slightly larger. These do not need to be exact — provide an adequate buffer rather than exact measurements. Click **Save** when done.
 
 ![Configure LPR camera detection](https://videos.cctvcamerapros.com/wp-content/files/configure-LPR-Camera-1024x546.jpg)
 
@@ -104,15 +113,19 @@ In the camera's web interface, go to **Config → License Plate Detection**. Ena
 - Use the camera's motorized zoom to frame the plate area — plates should fill roughly 10-15% of the frame width
 - Night performance is built in (IR illumination + headlight compensation) — no additional lighting needed
 
-### 6. License Plate Database (Optional)
+### 6. License Plate Database Setup (Optional)
 
-To use the authorized/not authorized feature in Home Assistant, add plates to the camera's allow list. Go to **License Plate Detection → Add**, enter the plate number, and select **Allow list** from the dropdown. You can also import plates in bulk via CSV.
+This step is optional. If you want to use the LPR camera's built-in database to manage a list of authorized plates, this is how you set that up. If you do not set up a list of authorized license plates in the database, the camera still sends all of the other data in the XML post except the authorization info.
+
+To add plates to the license plate database, click on the **License Plate Detection** link on the left. Then, click on the **Add** button. You can also click on the **Bulk Entry** button if you want to upload a large list of license plates using a CSV file.
 
 ![Camera license plate database](https://videos.cctvcamerapros.com/wp-content/files/camera-license-plate-database-1024x546.jpg)
 
+On the Vehicle Information screen, enter the license plate number and select **Allow list** from the List Type dropdown if you want this to be an authorized plate. The rest of the information is optional. Click **Save** when done. Repeat this process for each license plate that you want to add to the database, or use the Bulk Entry to upload a CSV list of plates.
+
 ![Add license plate to database](https://videos.cctvcamerapros.com/wp-content/files/add-license-plate-database.jpg)
 
-You can also manage plates programmatically via the [viewtron Python SDK](https://github.com/mikehaldas/viewtron-python-sdk):
+Plates on the allow list will show as `Authorized` in Home Assistant. You can also manage plates programmatically via the [viewtron Python SDK](https://github.com/mikehaldas/viewtron-python-sdk):
 
 ```python
 from viewtron import ViewtronCamera
@@ -124,13 +137,13 @@ camera.add_plate("ABC1234", owner="Mike", list_type="whiteList")
 
 ### 7. Configure the HTTP Post Webhook Server
 
-Navigate to **Network → HTTP POST** and click **Edit**. Click **Add** and enter the bridge connection details:
+In the camera's web interface, go to the **Network** section, then select **HTTP POST**. On the HTTP Post screen, click on the **Edit** button. Then click **Add** and enter the API server's IP address, port, and path:
 
 - **Server IP:** the machine running this bridge
 - **Port:** `5002` (or whatever you set in config.yaml)
 - **Path:** `/API`
 
-Select the alarm types you want to forward (License Plate, Intrusion, Face Detection, etc.).
+You can configure which alarm types and data to send. Select the detection types you want forwarded to Home Assistant (License Plate, Intrusion, Face Detection, etc.). When done, click the **Save** button.
 
 ![HTTP Post server add](https://videos.cctvcamerapros.com/wp-content/files/http-post-server-add-1024x432.jpg)
 
