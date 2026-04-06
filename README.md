@@ -1,8 +1,8 @@
-# Viewtron IP Camera → Home Assistant
+# Home Assistant Security Camera Integration for Viewtron AI Cameras
 
-Home Assistant integration for Viewtron AI security cameras. License plate recognition, person/vehicle detection, and face detection — delivered as native HA sensors via MQTT auto-discovery.
+This home Assistant integration for Viewtron AI security camerass includes icense plate recognition, person/vehicle detection, and face detection — delivered as native HA sensors via MQTT auto-discovery.
 
-The camera does all AI processing on-device. No Frigate, no Coral TPU, no cloud API, no subscription.
+The Viewtron camera does all AI inference processing on-device. No Frigate, no Coral TPU, no cloud API, no subscription.
 
 ## What It Does
 
@@ -13,18 +13,18 @@ Viewtron IP Camera → HTTP POST (XML) → viewtron_bridge.py → MQTT → Home 
 ```
 
 **Example automations:**
-- Garage door opens when your plate is recognized
-- Phone notification when unknown vehicle arrives
+- Garage door opens when your license plate is recognized
+- Phone notification when vehicle arrives with an unknown plate
 - Driveway lights turn on when person detected at night
-- Doorbell alert with face attributes
+- Access control and alarms based on facial recognition
 
 ## Supported Detection Types
 
 | Detection | HA Entity | Data |
 |-----------|-----------|------|
-| **License Plate (LPR)** | `sensor.viewtron_*_plate` | Plate number, authorized/not authorized, vehicle brand/color/type |
-| **Person/Vehicle Intrusion** | `binary_sensor.viewtron_*_intrusion` | Zone entry, exit, line crossing, loitering |
-| **Face Detection** | `binary_sensor.viewtron_*_face` | Age, sex, glasses, mask |
+| **License Plate REcognition (LPR)** | `sensor.viewtron_*_plate` | Plate number, authorized/not authorized, vehicle brand/color/type |
+| **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Zone entry, exit, line crossing, loitering, intrusion detection |
+| **Face Detection** | `binary_sensor.viewtron_*_face` | Authorized |
 | **Object Counting** | `sensor.viewtron_*_counting` | People/vehicle count by line or area |
 
 All entities auto-discover via MQTT — no manual YAML configuration.
