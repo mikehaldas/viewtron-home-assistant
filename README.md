@@ -1,6 +1,6 @@
 # Home Assistant Security Camera Integration for Viewtron AI Cameras
 
-This home Assistant integration for Viewtron AI security camerass includes icense plate recognition, person/vehicle detection, and face detection — delivered as native HA sensors via MQTT auto-discovery.
+This Home Assistant integration for Viewtron AI security cameras includes license plate recognition, person/vehicle detection, and face detection — delivered as native HA sensors via MQTT auto-discovery.
 
 The Viewtron camera does all AI inference processing on-device. No Frigate, no Coral TPU, no cloud API, no subscription.
 
@@ -22,7 +22,7 @@ Viewtron IP Camera → HTTP POST (XML) → viewtron_bridge.py → MQTT → Home 
 
 | Detection | HA Entity | Data |
 |-----------|-----------|------|
-| **License Plate REcognition (LPR)** | `sensor.viewtron_*_plate` | Plate number, authorized/not authorized, vehicle brand/color/type |
+| **License Plate Recognition (LPR)** | `sensor.viewtron_*_plate` | Plate number, authorized/not authorized, vehicle brand/color/type |
 | **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Zone entry, exit, line crossing, loitering, intrusion detection |
 | **Face Detection** | `binary_sensor.viewtron_*_face` | Authorized |
 | **Object Counting** | `sensor.viewtron_*_counting` | People/vehicle count by line or area |
@@ -242,20 +242,6 @@ See [`example_automations.yaml`](example_automations.yaml) for ready-to-use HA a
         title: "Unknown vehicle"
         message: "Plate {{ states('sensor.viewtron_ipc_plate') }} detected"
 ```
-
-## Why Not Frigate?
-
-| | Frigate Stack | This Integration |
-|---|---|---|
-| Where AI runs | Your server (needs Coral TPU) | On the camera |
-| Software layers | 5-6 (Frigate, Docker, MQTT, PaddleOCR, YAML) | 1 (this bridge) |
-| LPR accuracy | Depends on camera angle + software tuning | Purpose-built LPR camera with IR illumination |
-| Night plates | Struggles (common complaint) | Dedicated plate IR illumination + headlight compensation |
-| Setup time | Hours of YAML config | Minutes |
-| Subscription | Free | Free |
-| Hardware cost | Camera + server + Coral TPU ($700+) | Just the camera |
-
-Frigate is great for general object detection across many camera brands. This integration is purpose-built for Viewtron cameras that do the AI on-device and push structured event data.
 
 ## Compatible Cameras
 
