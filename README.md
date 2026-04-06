@@ -31,7 +31,7 @@ All entities auto-discover via MQTT — no manual YAML configuration.
 
 ## Setup
 
-### 1. Install
+### 1. Install Viewtron Home Assistant Camera Integration
 
 ```bash
 git clone https://github.com/mikehaldas/viewtron-home-assistant.git
@@ -84,8 +84,11 @@ home_assistant:
     lpr: viewtron-lpr
     intrusion: viewtron-intrusion
 ```
+### 4. Setup the IP Camera on Your Network
 
-### 4. Configure HTTP Post on Your Camera
+Once your Viewtron LPR camera or general purpose Viewtron AI camera is connected to your network, you may need to use the Viewtron IP installer tool to locate the camera on your network. You an [download IP installer tools for Mac and Windows on this page](https://www.cctvcamerapros.com/viewtron-software-apps-s/1482.htm).
+
+### 5. Configure HTTP Post on Your Camera
 
 In the camera's web interface, configure the HTTP Post / Alarm Server to send events to the bridge:
 
