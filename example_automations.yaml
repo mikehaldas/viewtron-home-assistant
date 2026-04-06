@@ -1,0 +1,175 @@
+# Viewtron → Home Assistant Example Automations
+#
+# These automations receive events from the Viewtron HA Bridge (ha_bridge.py).
+# Add them to your Home Assistant configuration.yaml or automations.yaml.
+#
+# The webhook ID must match what you configured in ha_bridge.yaml.
+# Event data is available as trigger.json (e.g., trigger.json.plate_number).
+#
+# JSON payload fields (all events):
+#   trigger.json.event_type         — alarm type (VEHICE, vehicle, PEA, regionIntrusion, etc.)
+#   trigger.json.event_description  — human-readable description
+#   trigger.json.camera_name        — camera device name
+#   trigger.json.camera_ip          — camera IP address
+#   trigger.json.timestamp          — event timestamp
+#
+# LPR events add:
+#   trigger.json.plate_number       — detected license plate text
+#   trigger.json.plate_authorized   — true if plate is on camera whitelist
+#   trigger.json.list_type          — "whiteList" or "blackList" (IPC v1.x only)
+#   trigger.json.vehicle.brand      — vehicle brand, e.g., "Ford" (NVR v2.0 only)
+#   trigger.json.vehicle.color      — vehicle color (NVR v2.0 only)
+#   trigger.json.vehicle.type       — vehicle type, e.g., "sedan" (NVR v2.0 only)
+#   trigger.json.vehicle.model      — vehicle model (NVR v2.0 only)
+#
+# Face events add:
+#   trigger.json.face.age           — estimated age
+#   trigger.json.face.sex           — male/female
+#   trigger.json.face.glasses       — glasses detection
+#   trigger.json.face.mask          — mask detection
+#
+# Intrusion events add:
+#   trigger.json.zone_action        — "entry", "exit", or "loiter" (IPC v1.x zone events)
+
+# ============================================================
+# 1. GARAGE DOOR — Opens when an authorized plate is detected
+# ============================================================
+# This is the #1 requested automation in the Home Assistant community.
+# The Viewtron LPR camera checks the plate against its whitelist
+# and sends plate_authorized: true for recognized vehicles.
+
+- alias: "LPR: Open garage for authorized plates"
+  id: viewtron_lpr_garage
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-lpr
+      allowed_methods:
+        - POST
+      local_only: true
+  condition:
+    - condition: template
+      value_template: "{{ trigger.json.plate_authorized == true }}"
+  action:
+    - service: cover.open_cover
+      target:
+        entity_id: cover.garage_door
+    - service: notify.mobile_app_your_phone
+      data:
+        title: "Garage opened"
+        message: "{{ trigger.json.plate_number }} arrived"
+
+# ============================================================
+# 2. UNKNOWN VEHICLE ALERT — Notification for unrecognized plates
+# ============================================================
+# Any plate not on the camera's whitelist triggers a notification.
+
+- alias: "LPR: Alert on unknown vehicle"
+  id: viewtron_lpr_unknown
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-lpr
+      allowed_methods:
+        - POST
+      local_only: true
+  condition:
+    - condition: template
+      value_template: "{{ trigger.json.plate_authorized == false }}"
+  action:
+    - service: notify.mobile_app_your_phone
+      data:
+        title: "Unknown vehicle"
+        message: >-
+          Plate {{ trigger.json.plate_number }} detected
+          at {{ trigger.json.camera_name }}
+
+# ============================================================
+# 3. DRIVEWAY LIGHTS — Turn on when person detected at night
+# ============================================================
+# Uses intrusion detection (person enters a zone).
+# Only triggers between sunset and sunrise.
+
+- alias: "Intrusion: Driveway lights on person detection"
+  id: viewtron_intrusion_lights
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-intrusion
+      allowed_methods:
+        - POST
+      local_only: true
+  condition:
+    - condition: sun
+      after: sunset
+      before: sunrise
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.driveway
+      data:
+        brightness_pct: 100
+    - delay: "00:05:00"
+    - service: light.turn_off
+      target:
+        entity_id: light.driveway
+
+# ============================================================
+# 4. FACE DETECTION — Doorbell notification with face info
+# ============================================================
+
+- alias: "Face: Doorbell visitor notification"
+  id: viewtron_face_doorbell
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-face
+      allowed_methods:
+        - POST
+      local_only: true
+  action:
+    - service: notify.mobile_app_your_phone
+      data:
+        title: "Someone at the door"
+        message: >-
+          {% if trigger.json.face is defined %}
+          Visitor: {{ trigger.json.face.sex }}, ~{{ trigger.json.face.age }} years old
+          {% else %}
+          Face detected at {{ trigger.json.camera_name }}
+          {% endif %}
+
+# ============================================================
+# 5. GATE ACCESS — Open gate for whitelisted plates, log all
+# ============================================================
+# Uses an input_text helper to display the last plate on a dashboard.
+# Replace switch.gate_opener with your relay/switch entity.
+
+- alias: "LPR: Gate access control"
+  id: viewtron_lpr_gate
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-lpr
+      allowed_methods:
+        - POST
+      local_only: true
+  action:
+    # Always log the plate to a dashboard helper
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.last_plate
+      data:
+        value: "{{ trigger.json.plate_number }} ({{ now().strftime('%H:%M') }})"
+    # Open gate only for authorized plates
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.json.plate_authorized == true }}"
+          sequence:
+            - service: switch.turn_on
+              target:
+                entity_id: switch.gate_opener
+            - delay: "00:00:03"
+            - service: switch.turn_off
+              target:
+                entity_id: switch.gate_opener
+      default:
+        - service: notify.mobile_app_your_phone
+          data:
+            title: "Gate: Unknown vehicle"
+            message: "{{ trigger.json.plate_number }} at gate"

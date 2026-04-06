@@ -1,0 +1,46 @@
+# Viewtron → Home Assistant Bridge Configuration
+#
+# Copy this file to config.yaml and update the values.
+#
+# Two output modes — use one or both:
+#
+#   MQTT (recommended): Entities appear automatically in HA via auto-discovery.
+#   Each camera becomes a device with sensors per detection type.
+#   No YAML needed — just add the MQTT integration in HA.
+#
+#   Webhooks: Forwards JSON to HA webhook triggers.
+#   You create webhook automations in HA that use trigger.json.
+#
+# HA receives events as:
+#   MQTT:    sensor.viewtron_<camera>_plate, binary_sensor.viewtron_<camera>_intrusion, etc.
+#   Webhook: trigger.json.plate_number, trigger.json.plate_authorized, etc.
+
+# Port this bridge listens on (configure your camera to send HTTP Posts here)
+bridge_port: 5002
+
+# Save event images (overview and target crops) to images/
+save_images: true
+
+# MQTT with Home Assistant auto-discovery
+mqtt:
+  enabled: true
+  broker: localhost    # your MQTT broker (Mosquitto)
+  port: 1883
+  # username: mqtt_user
+  # password: mqtt_pass
+  discovery_prefix: homeassistant   # HA default
+  topic_prefix: viewtron            # state topics: viewtron/<camera>/<category>
+  expire_after: 30                  # seconds before binary sensors reset to OFF
+
+# Webhook output (optional — runs alongside MQTT if configured)
+home_assistant:
+  url: http://localhost:8123
+
+  # Webhook IDs per event category (create in HA: Settings → Automations → Webhook trigger)
+  # Comment out the webhooks section to disable webhook output entirely.
+  webhooks:
+    lpr: viewtron-lpr
+    intrusion: viewtron-intrusion
+    face: viewtron-face
+    # counting: viewtron-counting
+    # all: viewtron-all           # catch-all for unconfigured categories
