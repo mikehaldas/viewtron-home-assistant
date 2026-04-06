@@ -86,31 +86,33 @@ home_assistant:
 ```
 ### 4. Setup the IP Camera on Your Network
 
-Once your Viewtron LPR camera or general purpose Viewtron AI camera is connected to your network, you may need to use the Viewtron IP installer tool to locate the camera on your network. You an [download IP installer tools for Mac and Windows on this page](https://www.cctvcamerapros.com/viewtron-software-apps-s/1482.htm).
+Once your Viewtron LPR camera or general purpose Viewtron AI camera is connected to your network, you may need to use the Viewtron IP installer tool to locate the camera on your network. You can [download IP installer tools for Mac and Windows on this page](https://www.cctvcamerapros.com/viewtron-software-apps-s/1482.htm).
 
-### 5. Configure HTTP Post Server on Your Camera
+![Locate IP camera on network](https://videos.cctvcamerapros.com/wp-content/files/IP-Camera-Login-1024x546.jpg)
 
-In the camera's web interface, configure the HTTP Post / Alarm Server to send events to the bridge:
+### 5. Configure License Plate Detection
 
-- **Server IP:** the machine running this bridge
-- **Port:** `5002` (or whatever you set in config.yaml)
-- **Path:** `/API`
+In the camera's web interface, go to **Config → License Plate Detection**. Enable detection, draw a detection zone covering the area where plates will be visible, and set the minimum/maximum plate size parameters. Leave adequate buffer margins around the expected plate area.
 
-Setup guide: [IP Camera HTTP Post Configuration](https://videos.cctvcamerapros.com/support/topic/ip-camera-api-webbooks)
+![Configure LPR camera detection](https://videos.cctvcamerapros.com/wp-content/files/configure-LPR-Camera-1024x546.jpg)
 
-### 6. Configure License Plate Recognition
+![Enable license plate detection](https://videos.cctvcamerapros.com/wp-content/files/enable-license-plate-detection-1024x546.jpg)
 
-Before the camera will send LPR events, you need to configure plate detection on the camera:
+**LPR installation best practices:**
+- Mount the camera at a 15-30° angle to the vehicle path — avoid head-on or extreme side angles
+- Keep the plate within 20-90 ft of the camera (LPR-IP4 range)
+- Use the camera's motorized zoom to frame the plate area — plates should fill roughly 10-15% of the frame width
+- Night performance is built in (IR illumination + headlight compensation) — no additional lighting needed
 
-**Detection settings:**
-- In the camera web interface, go to **AI Config → License Plate Recognition**
-- Set the detection zone to cover the area where plates will be visible
-- Adjust sensitivity and minimum plate size for your installation distance
+### 6. License Plate Database (Optional)
 
-**Plate database (whitelist/blacklist):**
-- Go to **AI Config → Plate Database** to add authorized plates
-- Plates on the whitelist will show as `Authorized` in Home Assistant
-- You can also manage plates programmatically via the [viewtron Python SDK](https://github.com/mikehaldas/viewtron-python-sdk):
+To use the authorized/not authorized feature in Home Assistant, add plates to the camera's allow list. Go to **License Plate Detection → Add**, enter the plate number, and select **Allow list** from the dropdown. You can also import plates in bulk via CSV.
+
+![Camera license plate database](https://videos.cctvcamerapros.com/wp-content/files/camera-license-plate-database-1024x546.jpg)
+
+![Add license plate to database](https://videos.cctvcamerapros.com/wp-content/files/add-license-plate-database.jpg)
+
+You can also manage plates programmatically via the [viewtron Python SDK](https://github.com/mikehaldas/viewtron-python-sdk):
 
 ```python
 from viewtron import ViewtronCamera
@@ -120,15 +122,23 @@ camera.login()
 camera.add_plate("ABC1234", owner="Mike", list_type="whiteList")
 ```
 
-**LPR installation best practices:**
-- Mount the camera at a 15-30° angle to the vehicle path — avoid head-on or extreme side angles
-- Keep the plate within 20-90 ft of the camera (LPR-IP4 range)
-- Use the camera's motorized zoom to frame the plate area — plates should fill roughly 10-15% of the frame width
-- Night performance is built in (IR illumination + headlight compensation) — no additional lighting needed
+### 7. Configure the HTTP Post Webhook Server
 
-Setup guide: [LPR Camera Setup](https://videos.cctvcamerapros.com/support/topic/ai-security-camera-api)
+Navigate to **Network → HTTP POST** and click **Edit**. Click **Add** and enter the bridge connection details:
 
-### 6. Run the Bridge
+- **Server IP:** the machine running this bridge
+- **Port:** `5002` (or whatever you set in config.yaml)
+- **Path:** `/API`
+
+Select the alarm types you want to forward (License Plate, Intrusion, Face Detection, etc.).
+
+![HTTP Post server add](https://videos.cctvcamerapros.com/wp-content/files/http-post-server-add-1024x432.jpg)
+
+![HTTP Post settings](https://videos.cctvcamerapros.com/wp-content/files/http-post-settings-1024x545.jpg)
+
+Detailed setup guide: [LPR Camera API Setup](https://videos.cctvcamerapros.com/v/lpr-camera-api.html)
+
+### 8. Run the Bridge
 
 ```bash
 source venv/bin/activate
@@ -137,7 +147,7 @@ python3 viewtron_bridge.py
 
 The first time a camera sends an event, a **Viewtron** device appears in HA with sensors for each detection type. No restart needed.
 
-### 7. Run on Boot (Production)
+### 9. Run on Boot (Production)
 
 To keep the bridge running after reboots:
 
