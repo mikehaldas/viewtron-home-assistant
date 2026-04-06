@@ -1,0 +1,25 @@
+name: Viewtron Bridge
+version: 1.0.0
+slug: viewtron-bridge
+description: Receives AI detection events from Viewtron IP cameras (LPR, person/vehicle, face) and delivers them to Home Assistant via MQTT auto-discovery.
+url: https://github.com/mikehaldas/viewtron-home-assistant
+arch:
+  - amd64
+  - aarch64
+  - armv7
+  - i386
+host_network: true
+options:
+  bridge_port: 5002
+  mqtt_broker: core-mosquitto
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+  save_images: false
+schema:
+  bridge_port: int
+  mqtt_broker: str
+  mqtt_port: int
+  mqtt_username: str
+  mqtt_password: str
+  save_images: bool
