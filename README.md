@@ -36,25 +36,33 @@ All entities auto-discover via MQTT — no manual YAML configuration.
 ```bash
 git clone https://github.com/mikehaldas/viewtron-home-assistant.git
 cd viewtron-home-assistant
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ### 2. MQTT Broker
 
-You need an MQTT broker. Most HA users already have Mosquitto — it's the most common HA add-on.
+The bridge communicates with Home Assistant through an MQTT broker. If you already have Mosquitto running (most HA users do), skip to step 3.
 
-**HAOS users:** Settings → Add-ons → Mosquitto broker → Install
+**HAOS users (Home Assistant OS):**
 
-**Docker/Linux users:**
+1. Go to **Settings → Add-ons → Add-on Store** (bottom right)
+2. Search for **Mosquitto broker** and click **Install**
+3. Click **Start**
+4. Go to **Settings → Devices & Services** — HA will auto-discover the Mosquitto add-on and prompt you to configure MQTT
+
+**Docker / Linux HA users:**
+
 ```bash
 docker run -d --name mosquitto --restart unless-stopped \
   -p 1883:1883 eclipse-mosquitto:2 \
   sh -c 'echo -e "listener 1883\nallow_anonymous true" > /mosquitto/config/mosquitto.conf && exec mosquitto -c /mosquitto/config/mosquitto.conf'
 ```
 
-Then add the MQTT integration in HA: Settings → Devices & Services → Add Integration → MQTT → broker: `localhost`, port: `1883`.
+Then add the MQTT integration in HA: **Settings → Devices & Services → Add Integration → MQTT** → broker: `localhost`, port: `1883`.
 
-### 3. Configure
+### 3. Configure the Bridge
 
 ```bash
 cp config.yaml.example config.yaml
@@ -77,29 +85,113 @@ home_assistant:
     intrusion: viewtron-intrusion
 ```
 
-### 4. Configure Your Camera
+### 4. Configure HTTP Post on Your Camera
 
-In the camera's web interface, set the HTTP Post / Alarm Server:
+In the camera's web interface, configure the HTTP Post / Alarm Server to send events to the bridge:
+
 - **Server IP:** the machine running this bridge
 - **Port:** `5002` (or whatever you set in config.yaml)
 - **Path:** `/API`
 
 Setup guide: [IP Camera HTTP Post Configuration](https://videos.cctvcamerapros.com/support/topic/ip-camera-api-webbooks)
 
-### 5. Run
+### 5. Configure License Plate Recognition
+
+Before the camera will send LPR events, you need to configure plate detection on the camera:
+
+**Detection settings:**
+- In the camera web interface, go to **AI Config → License Plate Recognition**
+- Set the detection zone to cover the area where plates will be visible
+- Adjust sensitivity and minimum plate size for your installation distance
+
+**Plate database (whitelist/blacklist):**
+- Go to **AI Config → Plate Database** to add authorized plates
+- Plates on the whitelist will show as `Authorized` in Home Assistant
+- You can also manage plates programmatically via the [viewtron Python SDK](https://github.com/mikehaldas/viewtron-python-sdk):
+
+```python
+from viewtron import ViewtronCamera
+
+camera = ViewtronCamera("192.168.0.20", "admin", "password")
+camera.login()
+camera.add_plate("ABC1234", owner="Mike", list_type="whiteList")
+```
+
+**LPR installation best practices:**
+- Mount the camera at a 15-30° angle to the vehicle path — avoid head-on or extreme side angles
+- Keep the plate within 20-90 ft of the camera (LPR-IP4 range)
+- Use the camera's motorized zoom to frame the plate area — plates should fill roughly 10-15% of the frame width
+- Night performance is built in (IR illumination + headlight compensation) — no additional lighting needed
+
+Setup guide: [LPR Camera Setup](https://videos.cctvcamerapros.com/support/topic/ai-security-camera-api)
+
+### 6. Run the Bridge
 
 ```bash
+source venv/bin/activate
 python3 viewtron_bridge.py
 ```
 
 The first time a camera sends an event, a **Viewtron** device appears in HA with sensors for each detection type. No restart needed.
+
+### 7. Run on Boot (Production)
+
+To keep the bridge running after reboots:
+
+**Docker / Linux users — systemd service:**
+
+```bash
+sudo tee /etc/systemd/system/viewtron-bridge.service > /dev/null << 'EOF'
+[Unit]
+Description=Viewtron Home Assistant Bridge
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/viewtron-home-assistant
+ExecStart=/path/to/viewtron-home-assistant/venv/bin/python3 viewtron_bridge.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable viewtron-bridge
+sudo systemctl start viewtron-bridge
+```
+
+Replace `YOUR_USERNAME` and `/path/to/viewtron-home-assistant` with your actual values.
+
+Check status: `sudo systemctl status viewtron-bridge`
+View logs: `sudo journalctl -u viewtron-bridge -f`
+
+**HAOS users — Docker container:**
+
+HAOS doesn't support systemd. Run the bridge as a Docker container instead:
+
+```bash
+docker run -d --name viewtron-bridge --restart unless-stopped \
+  --network host \
+  -v /path/to/config.yaml:/app/config.yaml \
+  python:3.12-slim \
+  sh -c 'pip install viewtron paho-mqtt pyyaml requests && \
+    cd /app && python3 -c "
+from urllib.request import urlretrieve
+urlretrieve(\"https://raw.githubusercontent.com/mikehaldas/viewtron-home-assistant/main/viewtron_bridge.py\", \"viewtron_bridge.py\")
+" && python3 viewtron_bridge.py'
+```
+
+A proper HA Add-on (click-to-install from the Add-on Store) is planned for a future release.
 
 ## How It Works
 
 Viewtron AI cameras run detection on-device (ALPR, face detection, human/vehicle classification) and send HTTP POST events with XML payloads. This bridge:
 
 1. Receives the XML event
-2. Parses it using the [viewtron](https://github.com/mikehaldas/viewtron-python) Python SDK
+2. Parses it using the [viewtron](https://github.com/mikehaldas/viewtron-python-sdk) Python SDK
 3. Converts to JSON
 4. Publishes to MQTT with HA auto-discovery config
 5. Optionally forwards to HA webhook triggers
@@ -114,16 +206,6 @@ The LPR sensor shows the last detected plate number. The Plate Status sensor sho
 |--------|-------|----------|
 | **License Plate** | `ABC1234` | Yes — shows last plate until next detection |
 | **Plate Status** | `Authorized` or `Not Authorized` | Yes |
-
-The camera maintains the whitelist — add plates via the camera web interface, NVR, or the [viewtron Python SDK](https://github.com/mikehaldas/viewtron-python):
-
-```python
-from viewtron import ViewtronCamera
-
-camera = ViewtronCamera("192.168.0.20", "admin", "password")
-camera.login()
-camera.add_plate("ABC1234", owner="Mike", list_type="whiteList")
-```
 
 ## Example Automations
 
@@ -187,7 +269,7 @@ Product page: [www.Viewtron.com](https://www.Viewtron.com)
 
 ## Related Projects
 
-- **[viewtron](https://github.com/mikehaldas/viewtron-python)** — Python SDK for Viewtron camera API (`pip install viewtron`)
+- **[viewtron](https://github.com/mikehaldas/viewtron-python-sdk)** — Python SDK for Viewtron camera API (`pip install viewtron`)
 - **[IP-Camera-API](https://github.com/mikehaldas/IP-Camera-API)** — Alarm server, API documentation, XML examples
 
 ## Author
