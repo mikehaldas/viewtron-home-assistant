@@ -253,7 +253,7 @@ See [`example_automations.yaml`](example_automations.yaml) for ready-to-use HA a
 | Night plates | Struggles (common complaint) | Dedicated plate IR illumination + headlight compensation |
 | Setup time | Hours of YAML config | Minutes |
 | Subscription | Free | Free |
-| Hardware cost | Camera + server + Coral TPU ($25-100) | Just the camera |
+| Hardware cost | Camera + server + Coral TPU ($700+) | Just the camera |
 
 Frigate is great for general object detection across many camera brands. This integration is purpose-built for Viewtron cameras that do the AI on-device and push structured event data.
 
