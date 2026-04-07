@@ -333,6 +333,8 @@ def build_json_payload(vt_event, alarm_type, client_ip):
             payload["plate_status"] = "Authorized"
         elif list_type == "blackList":
             payload["plate_status"] = "Blacklisted"
+        elif list_type == "temporaryList":
+            payload["plate_status"] = "Temporary"
         else:
             payload["plate_status"] = "Unknown"
 
