@@ -18,6 +18,28 @@ Viewtron IP Camera → HTTP POST (XML) → viewtron_bridge.py → MQTT → Home 
 - Driveway lights turn on when person detected at night
 - Access control and alarms based on facial recognition
 
+### What Home Assistant Receives
+
+When a license plate is detected, two sensors appear on the Viewtron device in Home Assistant:
+
+| Sensor | What It Shows | Example |
+|--------|---------------|---------|
+| **License Plate** | The plate number that was read | `ABC1234` |
+| **Plate Status** | Whether the plate is in the camera's database | `Authorized` |
+
+The **Plate Status** sensor has four possible values:
+
+| Status | Meaning |
+|--------|---------|
+| **Authorized** | Plate is on the camera's allow list |
+| **Blacklisted** | Plate is on the camera's block list |
+| **Temporary** | Plate is on the temporary list and within its valid date range |
+| **Unknown** | Plate is not in the camera's database |
+
+These are the two inputs your Home Assistant automations use. For example, when Plate Status changes to `Authorized`, open the garage door. When it changes to `Unknown`, send a notification.
+
+The plate database is managed directly on the LPR camera — add, remove, and organize plates through the camera's web interface. See [License Plate Database Setup](#3-license-plate-database-setup-optional) in the camera setup section below for instructions.
+
 ## Supported Detection Types
 
 | Detection | HA Entity | Status |
@@ -219,17 +241,6 @@ Viewtron AI cameras run detection on-device (ALPR, face detection, human/vehicle
 5. Optionally forwards to HA webhook triggers
 
 The bridge handles both **IP Camera direct (v1.x)** and **NVR forwarded (v2.0)** event formats automatically.
-
-## LPR Plate Data
-
-The LPR sensor shows the last detected plate number. The Plate Status sensor shows the plate's database status:
-
-| Sensor | Value | Persists |
-|--------|-------|----------|
-| **License Plate** | `ABC1234` | Yes — shows last plate until next detection |
-| **Plate Status** | `Authorized`, `Blacklisted`, `Temporary`, or `Unknown` | Yes |
-
-The camera validates plate date ranges internally. Any plate with an expired end date — whether on the allow list, block list, or temporary list — will show as `Unknown`. Use "Valid Forever" in the camera firmware to prevent plates from silently expiring.
 
 ## Example Automations
 
