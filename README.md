@@ -33,6 +33,20 @@ LPR is fully tested end-to-end with the Viewtron LPR-IP4 camera. The other detec
 
 ### 1. Install Viewtron Home Assistant Camera Integration
 
+**Docker (recommended):**
+
+```bash
+docker run -d --name viewtron-bridge --restart unless-stopped \
+  --network host \
+  -e BRIDGE_PORT=5002 \
+  -e MQTT_BROKER=localhost \
+  ghcr.io/mikehaldas/viewtron-bridge
+```
+
+That's it — the bridge is running and will survive reboots. Skip to step 2.
+
+**Manual install:**
+
 ```bash
 git clone https://github.com/mikehaldas/viewtron-home-assistant.git
 cd viewtron-home-assistant
@@ -158,24 +172,22 @@ Detailed setup guide: [LPR Camera API Setup](https://videos.cctvcamerapros.com/v
 
 ### 8. Run the Bridge
 
+**If you used the Docker install (step 1),** the bridge is already running. The first time a camera sends an event, a **Viewtron** device appears in HA with sensors for each detection type. No restart needed.
+
+**If you used the manual install,** start the bridge:
+
 ```bash
 source venv/bin/activate
 python3 viewtron_bridge.py
 ```
 
-The first time a camera sends an event, a **Viewtron** device appears in HA with sensors for each detection type. No restart needed.
-
-### 9. Run on Boot (Production)
-
-To keep the bridge running after reboots:
-
-**Docker / Linux users — systemd service:**
+To run on boot with the manual install, create a systemd service:
 
 ```bash
 sudo tee /etc/systemd/system/viewtron-bridge.service > /dev/null << 'EOF'
 [Unit]
 Description=Viewtron Home Assistant Bridge
-After=network.target docker.service
+After=network.target
 
 [Service]
 Type=simple
@@ -195,27 +207,6 @@ sudo systemctl start viewtron-bridge
 ```
 
 Replace `YOUR_USERNAME` and `/path/to/viewtron-home-assistant` with your actual values.
-
-Check status: `sudo systemctl status viewtron-bridge`
-View logs: `sudo journalctl -u viewtron-bridge -f`
-
-**HAOS users — Docker container:**
-
-HAOS doesn't support systemd. Run the bridge as a Docker container instead:
-
-```bash
-docker run -d --name viewtron-bridge --restart unless-stopped \
-  --network host \
-  -v /path/to/config.yaml:/app/config.yaml \
-  python:3.12-slim \
-  sh -c 'pip install viewtron paho-mqtt pyyaml requests && \
-    cd /app && python3 -c "
-from urllib.request import urlretrieve
-urlretrieve(\"https://raw.githubusercontent.com/mikehaldas/viewtron-home-assistant/main/viewtron_bridge.py\", \"viewtron_bridge.py\")
-" && python3 viewtron_bridge.py'
-```
-
-A proper HA Add-on (click-to-install from the Add-on Store) is planned for a future release.
 
 ## How It Works
 
