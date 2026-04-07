@@ -162,6 +162,8 @@ Log into the camera using its IP address in a web browser. Enter the camera's us
 
 ### 2. License Plate Detection Configuration
 
+Please note that these instructions are specicially for [Viewtron license plate recognition cameras](https://www.cctvcamerapros.com/License-Plate-Recognition-Systems-s/1518.htm). The Viewtron LPR-IP4 (4mp LPR) is the model that we have tested with and highly recommend. This repo will be updated with setup instructions for human detection, car detection, and face recognition AI cameras and events as soon as possible.
+
 ![Configure LPR camera detection](https://videos.cctvcamerapros.com/wp-content/files/configure-LPR-Camera-1024x546.jpg)
 
 Navigate to the **Config** tab, then select **License Plate Detection**.
