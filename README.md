@@ -2,7 +2,7 @@
 
 This Home Assistant integration for Viewtron AI security cameras includes license plate recognition, person/vehicle detection, and face detection — delivered as native HA sensors via MQTT auto-discovery.
 
-**Please Note: all of he integration and testing so far have been done with our license plate recognition camera (LPR). The other types of AI cameras and events will be added asap.**
+**Please Note: all of the integration and testing so far has been done with our license plate recognition camera (LPR). The other types of AI cameras and events will be added asap.**
 
 The Viewtron camera does all AI inference processing on-device. No Frigate, no Coral TPU, no cloud API, no subscription.
 
@@ -164,7 +164,7 @@ Log into the camera using its IP address in a web browser. Enter the camera's us
 
 ### 2. License Plate Detection Configuration
 
-Please note that these instructions are specicially for [Viewtron license plate recognition cameras](https://www.cctvcamerapros.com/License-Plate-Recognition-Systems-s/1518.htm). The Viewtron LPR-IP4 (4mp LPR) is the model that we have tested with and highly recommend. This repo will be updated with setup instructions for human detection, car detection, and face recognition AI cameras and events as soon as possible.
+Please note that these instructions are specifically for [Viewtron license plate recognition cameras](https://www.cctvcamerapros.com/License-Plate-Recognition-Systems-s/1518.htm). The Viewtron LPR-IP4 (4mp LPR) is the model that we have tested with and highly recommend. This repo will be updated with setup instructions for human detection, car detection, and face recognition AI cameras and events as soon as possible.
 
 ![Configure LPR camera detection](https://videos.cctvcamerapros.com/wp-content/files/configure-LPR-Camera-1024x546.jpg)
 
