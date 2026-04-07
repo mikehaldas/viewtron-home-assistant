@@ -1,9 +1,9 @@
 # Viewtron → Home Assistant Example Automations
 #
-# These automations receive events from the Viewtron HA Bridge (ha_bridge.py).
+# These automations receive events from the Viewtron HA Bridge.
 # Add them to your Home Assistant configuration.yaml or automations.yaml.
 #
-# The webhook ID must match what you configured in ha_bridge.yaml.
+# The webhook ID must match what you configured in config.yaml.
 # Event data is available as trigger.json (e.g., trigger.json.plate_number).
 #
 # JSON payload fields (all events):
@@ -15,8 +15,7 @@
 #
 # LPR events add:
 #   trigger.json.plate_number       — detected license plate text
-#   trigger.json.plate_authorized   — true if plate is on camera whitelist
-#   trigger.json.list_type          — "whiteList" or "blackList" (IPC v1.x only)
+#   trigger.json.plate_status       — "Authorized", "Blacklisted", or "Unknown"
 #   trigger.json.vehicle.brand      — vehicle brand, e.g., "Ford" (NVR v2.0 only)
 #   trigger.json.vehicle.color      — vehicle color (NVR v2.0 only)
 #   trigger.json.vehicle.type       — vehicle type, e.g., "sedan" (NVR v2.0 only)
@@ -34,9 +33,8 @@
 # ============================================================
 # 1. GARAGE DOOR — Opens when an authorized plate is detected
 # ============================================================
-# This is the #1 requested automation in the Home Assistant community.
-# The Viewtron LPR camera checks the plate against its whitelist
-# and sends plate_authorized: true for recognized vehicles.
+# The Viewtron LPR camera checks the plate against its allow list
+# and sends plate_status: "Authorized" for recognized vehicles.
 
 - alias: "LPR: Open garage for authorized plates"
   id: viewtron_lpr_garage
@@ -48,7 +46,7 @@
       local_only: true
   condition:
     - condition: template
-      value_template: "{{ trigger.json.plate_authorized == true }}"
+      value_template: "{{ trigger.json.plate_status == 'Authorized' }}"
   action:
     - service: cover.open_cover
       target:
@@ -61,7 +59,7 @@
 # ============================================================
 # 2. UNKNOWN VEHICLE ALERT — Notification for unrecognized plates
 # ============================================================
-# Any plate not on the camera's whitelist triggers a notification.
+# Any plate not on the camera's allow list triggers a notification.
 
 - alias: "LPR: Alert on unknown vehicle"
   id: viewtron_lpr_unknown
@@ -73,7 +71,7 @@
       local_only: true
   condition:
     - condition: template
-      value_template: "{{ trigger.json.plate_authorized == false }}"
+      value_template: "{{ trigger.json.plate_status == 'Unknown' }}"
   action:
     - service: notify.mobile_app_your_phone
       data:
@@ -83,7 +81,31 @@
           at {{ trigger.json.camera_name }}
 
 # ============================================================
-# 3. DRIVEWAY LIGHTS — Turn on when person detected at night
+# 3. BLACKLISTED VEHICLE — Alarm for blocked plates
+# ============================================================
+# Plates on the camera's block list trigger an alert.
+
+- alias: "LPR: Blacklisted vehicle alert"
+  id: viewtron_lpr_blacklisted
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-lpr
+      allowed_methods:
+        - POST
+      local_only: true
+  condition:
+    - condition: template
+      value_template: "{{ trigger.json.plate_status == 'Blacklisted' }}"
+  action:
+    - service: notify.mobile_app_your_phone
+      data:
+        title: "BLACKLISTED vehicle detected"
+        message: >-
+          Plate {{ trigger.json.plate_number }} is on the block list!
+          Camera: {{ trigger.json.camera_name }}
+
+# ============================================================
+# 4. DRIVEWAY LIGHTS — Turn on when person detected at night
 # ============================================================
 # Uses intrusion detection (person enters a zone).
 # Only triggers between sunset and sunrise.
@@ -112,7 +134,7 @@
         entity_id: light.driveway
 
 # ============================================================
-# 4. FACE DETECTION — Doorbell notification with face info
+# 5. FACE DETECTION — Doorbell notification with face info
 # ============================================================
 
 - alias: "Face: Doorbell visitor notification"
@@ -135,7 +157,7 @@
           {% endif %}
 
 # ============================================================
-# 5. GATE ACCESS — Open gate for whitelisted plates, log all
+# 6. GATE ACCESS — Full access control with logging
 # ============================================================
 # Uses an input_text helper to display the last plate on a dashboard.
 # Replace switch.gate_opener with your relay/switch entity.
@@ -154,12 +176,12 @@
       target:
         entity_id: input_text.last_plate
       data:
-        value: "{{ trigger.json.plate_number }} ({{ now().strftime('%H:%M') }})"
-    # Open gate only for authorized plates
+        value: "{{ trigger.json.plate_number }} ({{ trigger.json.plate_status }}) {{ now().strftime('%H:%M') }}"
+    # Handle each status
     - choose:
         - conditions:
             - condition: template
-              value_template: "{{ trigger.json.plate_authorized == true }}"
+              value_template: "{{ trigger.json.plate_status == 'Authorized' }}"
           sequence:
             - service: switch.turn_on
               target:
@@ -168,8 +190,16 @@
             - service: switch.turn_off
               target:
                 entity_id: switch.gate_opener
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.json.plate_status == 'Blacklisted' }}"
+          sequence:
+            - service: notify.mobile_app_your_phone
+              data:
+                title: "BLOCKED vehicle at gate"
+                message: "{{ trigger.json.plate_number }} is blacklisted!"
       default:
         - service: notify.mobile_app_your_phone
           data:
-            title: "Gate: Unknown vehicle"
-            message: "{{ trigger.json.plate_number }} at gate"
+            title: "Unknown vehicle at gate"
+            message: "{{ trigger.json.plate_number }}"

@@ -218,7 +218,7 @@ class MQTTBridge:
                     "name": "Plate Status",
                     "unique_id": f"viewtron_{camera_id}_plate_authorized",
                     "state_topic": f"{base_topic}/lpr",
-                    "value_template": "{{ 'Authorized' if value_json.plate_authorized else 'Not Authorized' }}",
+                    "value_template": "{{ value_json.plate_status }}",
                     "json_attributes_topic": f"{base_topic}/lpr",
                     "json_attributes_template": "{{ value_json | tojson }}",
                     "icon": "mdi:shield-car",
@@ -324,12 +324,17 @@ def build_json_payload(vt_event, alarm_type, client_ip):
     # LPR fields
     if alarm_type in ("VEHICE", "VEHICLE", "vehicle"):
         payload["plate_number"] = vt_event.get_plate_number()
-        payload["plate_authorized"] = vt_event.is_plate_authorized()
 
+        # Three-state plate status: Authorized, Blacklisted, Unknown
+        list_type = None
         if hasattr(vt_event, "get_vehicle_list_type"):
             list_type = vt_event.get_vehicle_list_type()
-            if list_type:
-                payload["list_type"] = list_type
+        if list_type == "whiteList":
+            payload["plate_status"] = "Authorized"
+        elif list_type == "blackList":
+            payload["plate_status"] = "Blacklisted"
+        else:
+            payload["plate_status"] = "Unknown"
 
         if hasattr(vt_event, "get_car_brand"):
             car_brand = vt_event.get_car_brand()
@@ -405,6 +410,8 @@ def forward_to_webhook(ha_url, webhook_id, payload, timeout=5):
 class HABridgeHandler(BaseHTTPRequestHandler):
     """HTTP handler that receives Viewtron events and forwards to HA."""
 
+    connected_cameras = {}  # ip → True (tracks which cameras we've seen)
+
     def log_message(self, format, *args):
         pass
 
@@ -440,6 +447,11 @@ class HABridgeHandler(BaseHTTPRequestHandler):
         client_ip = self.client_address[0]
 
         if length == 0:
+            # Keepalive — log first time we see each camera
+            if client_ip not in HABridgeHandler.connected_cameras:
+                HABridgeHandler.connected_cameras[client_ip] = True
+                ts = dt.now().strftime("%H:%M:%S")
+                print(f"[{ts}] Camera connected: {client_ip}")
             return
 
         body = self.rfile.read(length)
@@ -513,8 +525,8 @@ class HABridgeHandler(BaseHTTPRequestHandler):
             extra = ""
             if "plate_number" in payload:
                 plate = payload["plate_number"]
-                auth = "authorized" if payload.get("plate_authorized") else "unknown"
-                extra = f" | {plate} ({auth})"
+                status = payload.get("plate_status", "Unknown").lower()
+                extra = f" | {plate} ({status})"
             elif "face" in payload:
                 face = payload["face"]
                 extra = f" | {face['age']} {face['sex']}"
