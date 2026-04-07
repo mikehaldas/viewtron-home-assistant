@@ -8,8 +8,6 @@ The Viewtron camera does all AI inference processing on-device. No Frigate, no C
 
 ## What It Does
 
-![Viewtron LPR camera in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera.jpg)
-
 Your Viewtron camera detects a license plate, person, vehicle, or face → this bridge receives the event → Home Assistant gets a sensor update. Automations take it from there.
 
 ```
@@ -24,7 +22,9 @@ Viewtron IP Camera → HTTP POST (XML) → viewtron_bridge.py → MQTT → Home 
 
 ### What Home Assistant Receives
 
-When a license plate is detected, two sensors appear on the Viewtron device in Home Assistant:
+![Viewtron LPR camera in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera.jpg)
+
+When a license plate is detected, two sensors appear on the Viewtron IP camera device in Home Assistant:
 
 | Sensor | What It Shows | Example |
 |--------|---------------|---------|
