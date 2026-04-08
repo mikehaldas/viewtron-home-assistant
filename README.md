@@ -216,17 +216,33 @@ camera.add_plate("ABC1234", owner="Mike", list_type="whiteList")
 
 ### 4. Configure the HTTP Post Webhook Server
 
-In the camera's web interface, go to the **Network** section, then select **HTTP POST**. On the HTTP Post screen, click on the **Edit** button. Then click **Add** and enter the API server's IP address, port, and path:
+In the camera's web interface, go to **Network > Advanced > HTTP Notification**.
 
-- **Server IP:** the machine running this bridge
-- **Port:** `5002` (or whatever you set as BRIDGE_PORT)
-- **Path:** `/API`
+![Viewtron camera HTTP POST settings](https://videos.cctvcamerapros.com/wp-content/files/IP-camera-HTTP-Post-Settings.jpg)
 
-You can configure which alarm types and data to send. Select the detection types you want forwarded to Home Assistant (License Plate, Intrusion, Face Detection, etc.). When done, click the **Save** button.
+Set the **Push Protocol Version** to **V1**, then click **Add** to create a server entry.
 
-![HTTP Post server add](https://videos.cctvcamerapros.com/wp-content/files/http-post-server-add-1024x432.jpg)
+> **Important:** You must select **V1** for Push Protocol Version. V2 sends alarm status events but images don't come through reliably.
 
-![HTTP Post settings](https://videos.cctvcamerapros.com/wp-content/files/http-post-settings-1024x545.jpg)
+Click **Edit**, then **Add** and configure the server connection:
+
+![HTTP POST server configuration](https://videos.cctvcamerapros.com/wp-content/files/IP-camera-HTTP-Post-Server.jpg)
+
+| Setting | Value |
+|---------|-------|
+| **Enable** | Checked |
+| **Domain/IP** | The machine running this bridge |
+| **Server Port** | `5002` (or your configured `BRIDGE_PORT`) |
+| **Path** | `/API` |
+| **Connection Type** | Persistent connection |
+| **Send Heartbeat** | Checked |
+| **Heartbeat Interval** | 30 seconds |
+| **Smart Alarm Data** | Check **Smart event data** |
+| **Original picture** | Optional — include full scene image |
+| **Target picture** | Optional — include cropped target image |
+| **Smart Alarm Type** | Select the detection types you want (e.g., License Plate Detection) |
+
+Click **Save**. The camera must be rebooted after initial HTTP POST configuration changes.
 
 Detailed setup guide: [LPR Camera API Setup](https://videos.cctvcamerapros.com/v/lpr-camera-api.html)
 
@@ -297,6 +313,7 @@ Product page: [www.Viewtron.com](https://www.Viewtron.com)
 ## Related Projects
 
 - **[viewtron](https://github.com/mikehaldas/viewtron-python-sdk)** — Python SDK for Viewtron camera API (`pip install viewtron`)
+- **[node-red-contrib-viewtron](https://github.com/mikehaldas/node-red-contrib-viewtron)** — Node-RED node for camera AI events (`npm install node-red-contrib-viewtron`)
 - **[IP-Camera-API](https://github.com/mikehaldas/IP-Camera-API)** — Alarm server, API documentation, XML examples
 
 ## Documentation
@@ -304,6 +321,7 @@ Product page: [www.Viewtron.com](https://www.Viewtron.com)
 - **[API Developer Docs](https://videos.cctvcamerapros.com/developer/)** — Full Viewtron API documentation with code examples
 - **[Home Assistant Integration Guide](https://videos.cctvcamerapros.com/developer/docs/integrations/home-assistant/)** — Setup, automations, and MQTT sensor reference
 - **[Python SDK Reference](https://videos.cctvcamerapros.com/developer/docs/getting-started/python-sdk/)** — Event classes, camera client, version routing
+- **[Node-RED Integration](https://videos.cctvcamerapros.com/developer/docs/integrations/node-red/)** — Direct camera-to-Node-RED with no middleware
 - **[LPR Application Guide](https://videos.cctvcamerapros.com/developer/docs/applications/license-plate-recognition-camera-api/)** — Webhook formats, plate database API, code examples
 
 ## Author
