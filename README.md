@@ -299,6 +299,13 @@ Product page: [www.Viewtron.com](https://www.Viewtron.com)
 - **[viewtron](https://github.com/mikehaldas/viewtron-python-sdk)** — Python SDK for Viewtron camera API (`pip install viewtron`)
 - **[IP-Camera-API](https://github.com/mikehaldas/IP-Camera-API)** — Alarm server, API documentation, XML examples
 
+## Documentation
+
+- **[API Developer Docs](https://videos.cctvcamerapros.com/developer/)** — Full Viewtron API documentation with code examples
+- **[Home Assistant Integration Guide](https://videos.cctvcamerapros.com/developer/docs/integrations/home-assistant/)** — Setup, automations, and MQTT sensor reference
+- **[Python SDK Reference](https://videos.cctvcamerapros.com/developer/docs/getting-started/python-sdk/)** — Event classes, camera client, version routing
+- **[LPR Application Guide](https://videos.cctvcamerapros.com/developer/docs/applications/license-plate-recognition-camera-api/)** — Webhook formats, plate database API, code examples
+
 ## Author
 
 Mike Haldas — [CCTV Camera Pros](https://www.cctvcamerapros.com)
