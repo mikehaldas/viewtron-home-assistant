@@ -35,13 +35,7 @@ mike@cctvcamerapros.net
 from socketserver import ThreadingMixIn
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime as dt
-from viewtron import (
-    LPR, FaceDetection, IntrusionDetection, IntrusionEntry, IntrusionExit,
-    LoiteringDetection, VideoMetadata,
-    VehicleLPR, FaceDetectionV2, RegionIntrusion, LineCrossing,
-    TargetCountingByLine, TargetCountingByArea, VideoMetadataV2,
-)
-import xmltodict
+from viewtron import ViewtronEvent
 import requests
 import base64
 import json
@@ -73,37 +67,6 @@ def load_config():
 
 
 # IPC v1.x alarm types → viewtron.py classes
-IPC_CLASSES = {
-    "VEHICE":   LPR,
-    "VEHICLE":  LPR,
-    "VFD":      FaceDetection,
-    "VSD":      VideoMetadata,
-    "PEA":      IntrusionDetection,
-    "AOIENTRY": IntrusionEntry,
-    "AOILEAVE": IntrusionExit,
-    "LOITER":   LoiteringDetection,
-}
-
-# NVR v2.0 alarm types → viewtron.py classes
-NVR_CLASSES = {
-    "regionIntrusion":      RegionIntrusion,
-    "lineCrossing":         LineCrossing,
-    "targetCountingByLine": TargetCountingByLine,
-    "targetCountingByArea": TargetCountingByArea,
-    "videoMetadata":        VideoMetadataV2,
-    "vehicle":              VehicleLPR,
-    "videoFaceDetect":      FaceDetectionV2,
-}
-
-# Map alarm types to event categories
-EVENT_CATEGORIES = {
-    "VEHICE": "lpr", "VEHICLE": "lpr", "vehicle": "lpr",
-    "VFD": "face", "videoFaceDetect": "face",
-    "PEA": "intrusion", "AOIENTRY": "intrusion", "AOILEAVE": "intrusion",
-    "LOITER": "intrusion", "regionIntrusion": "intrusion", "lineCrossing": "intrusion",
-    "targetCountingByLine": "counting", "targetCountingByArea": "counting",
-    "VSD": "metadata", "videoMetadata": "metadata",
-}
 
 
 # ====================== MQTT AUTO-DISCOVERY ======================
@@ -411,6 +374,7 @@ def forward_to_webhook(ha_url, webhook_id, payload, timeout=5):
 
 class HABridgeHandler(BaseHTTPRequestHandler):
     """HTTP handler that receives Viewtron events and forwards to HA."""
+    protocol_version = "HTTP/1.1"
 
     connected_cameras = {}  # ip → True (tracks which cameras we've seen)
 
@@ -467,35 +431,15 @@ class HABridgeHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            data = xmltodict.parse(text)
-            xml_config = data.get("config", {})
-            version = xml_config.get("@version", "")
+            vt_event = ViewtronEvent(text)
+            if vt_event is None:
+                return
 
-            # === Determine alarm type and parse ===
-            if version.startswith("2"):
-                msg_type = str(xml_config.get("messageType", "")).strip()
-                if msg_type != "alarmData":
-                    return
-                alarm_type = str(xml_config.get("smartType", "")).strip()
-                if alarm_type not in NVR_CLASSES:
-                    return
-                vt_event = NVR_CLASSES[alarm_type](text)
-            else:
-                st = xml_config.get("smartType", {})
-                if isinstance(st, dict):
-                    alarm_type = (
-                        st.get("#text") or st.get("value") or st.get("@type") or ""
-                    )
-                else:
-                    alarm_type = str(st)
-                alarm_type = alarm_type.strip()
-                if alarm_type not in IPC_CLASSES:
-                    return
-                vt_event = IPC_CLASSES[alarm_type](text)
+            alarm_type = vt_event.get_alarm_type()
+            category = vt_event.category
 
             # === Build JSON payload ===
             payload = build_json_payload(vt_event, alarm_type, client_ip)
-            category = EVENT_CATEGORIES.get(alarm_type, "unknown")
 
             # === Save images if configured ===
             if config.get("save_images", True) and vt_event.images_exist():
