@@ -22,14 +22,16 @@ Viewtron IP Camera → HTTP POST (XML) → viewtron_bridge.py → MQTT → Home 
 
 ### What Home Assistant Receives
 
-![Viewtron LPR camera in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera.jpg)
+![Viewtron LPR camera MQTT sensors in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera-MQTT.jpg)
 
-When a license plate is detected, two sensors appear on the Viewtron IP camera device in Home Assistant:
+When a license plate is detected, four entities appear on the Viewtron IP camera device in Home Assistant:
 
-| Sensor | What It Shows | Example |
+| Entity | What It Shows | Example |
 |--------|---------------|---------|
 | **License Plate** | The plate number that was read | `ABC1234` |
-| **Plate Status** | Whether the plate is in the camera's database | `Authorized` |
+| **Status** | Whether the plate is in the camera's database | `Authorized` |
+| **Overview** | Full scene image at the time of detection | JPEG image |
+| **Plate** | Cropped close-up of the license plate | JPEG image |
 
 The **Plate Status** sensor has four possible values:
 
@@ -40,7 +42,9 @@ The **Plate Status** sensor has four possible values:
 | **Temporary** | Plate is on the temporary list and within its valid date range |
 | **Unknown** | Plate is not in the camera's database |
 
-These are the two inputs your Home Assistant automations use. For example, when Plate Status changes to `Authorized`, open the garage door. When it changes to `Unknown`, send a notification.
+![Viewtron LPR camera dashboard card in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera.jpg)
+
+These are the inputs your Home Assistant automations use. For example, when Plate Status changes to `Authorized`, open the garage door. When it changes to `Unknown`, send a notification.
 
 The plate database is managed directly on the LPR camera — add, remove, and organize plates through the camera's web interface. See [License Plate Database Setup](#3-license-plate-database-setup-optional) in the camera setup section below for instructions.
 
@@ -101,7 +105,7 @@ To run the bridge after setup:
 
 ```bash
 source venv/bin/activate
-python3 viewtron_bridge.py
+python3 viewtron-bridge/viewtron_bridge.py
 ```
 
 To run on boot, create a systemd service:
@@ -116,7 +120,7 @@ After=network.target
 Type=simple
 User=YOUR_USERNAME
 WorkingDirectory=/path/to/viewtron-home-assistant
-ExecStart=/path/to/viewtron-home-assistant/venv/bin/python3 viewtron_bridge.py
+ExecStart=/path/to/viewtron-home-assistant/venv/bin/python3 viewtron-bridge/viewtron_bridge.py
 Restart=always
 RestartSec=5
 
@@ -210,8 +214,8 @@ Plates on the allow list will show as `Authorized` in Home Assistant. You can al
 from viewtron import ViewtronCamera
 
 camera = ViewtronCamera("192.168.0.20", "admin", "password")
-camera.login()
-camera.add_plate("ABC1234", owner="Mike", list_type="whiteList")
+camera.add_plate("ABC1234")
+camera.modify_plate("ABC1234", owner="Mike")
 ```
 
 ### 4. Configure the HTTP Post Webhook Server
@@ -238,8 +242,8 @@ Click **Edit**, then **Add** and configure the server connection:
 | **Send Heartbeat** | Checked |
 | **Heartbeat Interval** | 30 seconds |
 | **Smart Alarm Data** | Check **Smart event data** |
-| **Original picture** | Optional — include full scene image |
-| **Target picture** | Optional — include cropped target image |
+| **Original picture** | **Checked** — full scene image (appears as Overview in HA) |
+| **Target picture** | **Checked** — cropped target image (appears as Plate in HA) |
 | **Smart Alarm Type** | Select the detection types you want (e.g., License Plate Detection) |
 
 Click **Save**. The camera must be rebooted after initial HTTP POST configuration changes.

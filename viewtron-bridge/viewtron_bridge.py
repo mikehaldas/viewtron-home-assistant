@@ -32,14 +32,10 @@ Written by Mike Haldas
 mike@cctvcamerapros.net
 """
 
-from socketserver import ThreadingMixIn
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime as dt
-from viewtron import ViewtronEvent
+from viewtron import ViewtronServer
 import requests
-import base64
 import json
-import socket
 import os
 import re
 import sys
@@ -178,13 +174,37 @@ class MQTTBridge:
             self.client.publish(
                 f"{self.discovery_prefix}/sensor/{camera_id}/plate_authorized/config",
                 json.dumps({
-                    "name": "Plate Status",
+                    "name": "Status",
                     "unique_id": f"viewtron_{camera_id}_plate_authorized",
                     "state_topic": f"{base_topic}/lpr",
                     "value_template": "{{ value_json.plate_status }}",
                     "json_attributes_topic": f"{base_topic}/lpr",
                     "json_attributes_template": "{{ value_json | tojson }}",
                     "icon": "mdi:shield-car",
+                    "device": device_info,
+                }),
+                retain=True,
+            )
+            # Image: overview scene
+            self.client.publish(
+                f"{self.discovery_prefix}/image/{camera_id}/overview/config",
+                json.dumps({
+                    "name": "Overview",
+                    "unique_id": f"viewtron_{camera_id}_overview",
+                    "image_topic": f"{base_topic}/overview_image",
+                    "content_type": "image/jpeg",
+                    "device": device_info,
+                }),
+                retain=True,
+            )
+            # Image: plate crop
+            self.client.publish(
+                f"{self.discovery_prefix}/image/{camera_id}/target/config",
+                json.dumps({
+                    "name": "Plate",
+                    "unique_id": f"viewtron_{camera_id}_target",
+                    "image_topic": f"{base_topic}/target_image",
+                    "content_type": "image/jpeg",
                     "device": device_info,
                 }),
                 retain=True,
@@ -244,8 +264,16 @@ class MQTTBridge:
                 retain=True,
             )
 
-    def publish_event(self, payload, category):
-        """Publish an event to MQTT, creating discovery configs if needed."""
+
+    def publish_event(self, payload, category, vt_event=None):
+        """Publish an event to MQTT, creating discovery configs if needed.
+
+        Args:
+            payload: JSON-serializable dict with event data.
+            category: Event category (lpr, intrusion, face, etc.).
+            vt_event: Optional event object — if provided and images exist,
+                publishes JPEG bytes to image topics for HA camera entities.
+        """
         if not self.connected:
             return False
 
@@ -266,6 +294,18 @@ class MQTTBridge:
         topic = f"{self.topic_prefix}/{camera_id}/{category}"
         retain = category == "lpr"
         self.client.publish(topic, json.dumps(payload), retain=retain)
+
+        # Publish images if available (retain LPR images for HA restart)
+        if vt_event and vt_event.images_exist():
+            base_topic = f"{self.topic_prefix}/{camera_id}"
+            retain_img = category == "lpr"
+            overview = vt_event.get_source_image_bytes()
+            if overview:
+                self.client.publish(f"{base_topic}/overview_image", overview, retain=retain_img)
+            target = vt_event.get_target_image_bytes()
+            if target:
+                self.client.publish(f"{base_topic}/target_image", target, retain=retain_img)
+
         return True
 
 
@@ -341,13 +381,13 @@ def save_event_images(vt_event, alarm_type, timestamp_str):
     os.makedirs(IMG_DIR, exist_ok=True)
     ts = dt.now().strftime("%Y%m%d_%H%M%S")
 
-    for img_type, exists_fn, get_fn in [
-        ("overview", vt_event.source_image_exists, vt_event.get_source_image),
-        ("target", vt_event.target_image_exists, vt_event.get_target_image),
+    for img_type, get_bytes in [
+        ("overview", vt_event.get_source_image_bytes),
+        ("target", vt_event.get_target_image_bytes),
     ]:
-        if exists_fn() and get_fn():
+        img_data = get_bytes()
+        if img_data:
             try:
-                img_data = base64.b64decode(get_fn())
                 filename = f"{ts}_{alarm_type}_{img_type}.jpg"
                 filepath = os.path.join(IMG_DIR, filename)
                 with open(filepath, "wb") as f:
@@ -370,133 +410,62 @@ def forward_to_webhook(ha_url, webhook_id, payload, timeout=5):
         return None
 
 
-# ====================== HTTP HANDLER ======================
+# ====================== EVENT HANDLER ======================
 
-class HABridgeHandler(BaseHTTPRequestHandler):
-    """HTTP handler that receives Viewtron events and forwards to HA."""
-    protocol_version = "HTTP/1.1"
+def make_event_handler(config, mqtt_bridge):
+    """Create the on_event callback with access to config and MQTT."""
 
-    connected_cameras = {}  # ip → True (tracks which cameras we've seen)
-
-    def log_message(self, format, *args):
-        pass
-
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"Viewtron -> Home Assistant Bridge running")
-
-    def do_POST(self):
-        if self.path not in ("/", "/API"):
-            self.send_response(404)
-            self.end_headers()
-            return
-
-        config = self.server.bridge_config
-        mqtt_bridge = self.server.mqtt_bridge
-
-        # Send XML success response (keeps camera connection alive)
-        success_xml = (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            '<config version="1.0" xmlns="http://www.ipc.com/ver10">'
-            "<status>success</status></config>"
-        )
-        self.send_response(200)
-        self.send_header("Content-Type", "application/xml")
-        self.send_header("Content-Length", str(len(success_xml)))
-        self.end_headers()
-        self.wfile.write(success_xml.encode("utf-8"))
-
-        # Read body
-        length = int(self.headers.get("Content-Length", 0))
-        client_ip = self.client_address[0]
-
-        if length == 0:
-            # Keepalive — log first time we see each camera
-            if client_ip not in HABridgeHandler.connected_cameras:
-                HABridgeHandler.connected_cameras[client_ip] = True
-                ts = dt.now().strftime("%H:%M:%S")
-                print(f"[{ts}] Camera connected: {client_ip}")
-            return
-
-        body = self.rfile.read(length)
-        text = body.decode("utf-8", errors="replace")
-
-        if "<?xml" not in text:
-            return
-
+    def on_event(vt_event, client_ip):
         # Skip traject — too high volume for MQTT/webhooks
-        if '<traject type="list"' in text:
+        if vt_event.category == "traject":
             return
 
-        try:
-            vt_event = ViewtronEvent(text)
-            if vt_event is None:
-                return
+        alarm_type = vt_event.get_alarm_type()
+        category = vt_event.category
 
-            alarm_type = vt_event.get_alarm_type()
-            category = vt_event.category
+        # === Build JSON payload ===
+        payload = build_json_payload(vt_event, alarm_type, client_ip)
 
-            # === Build JSON payload ===
-            payload = build_json_payload(vt_event, alarm_type, client_ip)
+        # === Save images if configured ===
+        if config.get("save_images", True) and vt_event.images_exist():
+            image_paths = save_event_images(
+                vt_event, alarm_type, payload["timestamp"]
+            )
+            payload.update(image_paths)
 
-            # === Save images if configured ===
-            if config.get("save_images", True) and vt_event.images_exist():
-                image_paths = save_event_images(
-                    vt_event, alarm_type, payload["timestamp"]
-                )
-                payload.update(image_paths)
+        # === Output: MQTT ===
+        mqtt_status = ""
+        if mqtt_bridge and mqtt_bridge.connected:
+            ok = mqtt_bridge.publish_event(payload, category, vt_event)
+            mqtt_status = "→ MQTT" if ok else "→ MQTT FAIL"
 
-            # === Output: MQTT ===
-            mqtt_status = ""
-            if mqtt_bridge and mqtt_bridge.connected:
-                ok = mqtt_bridge.publish_event(payload, category)
-                mqtt_status = "→ MQTT" if ok else "→ MQTT FAIL"
+        # === Output: Webhook ===
+        webhook_status = ""
+        ha_config = config.get("home_assistant", {})
+        webhooks = ha_config.get("webhooks", {})
+        if webhooks:
+            webhook_id = webhooks.get(category) or webhooks.get("all")
+            if webhook_id:
+                ha_url = ha_config["url"].rstrip("/")
+                code = forward_to_webhook(ha_url, webhook_id, payload)
+                webhook_status = f"→ WH {code}" if code else "→ WH FAIL"
 
-            # === Output: Webhook ===
-            webhook_status = ""
-            ha_config = config.get("home_assistant", {})
-            webhooks = ha_config.get("webhooks", {})
-            if webhooks:
-                webhook_id = webhooks.get(category) or webhooks.get("all")
-                if webhook_id:
-                    ha_url = ha_config["url"].rstrip("/")
-                    code = forward_to_webhook(ha_url, webhook_id, payload)
-                    webhook_status = f"→ WH {code}" if code else "→ WH FAIL"
+        # === Console output ===
+        ts = dt.now().strftime("%H:%M:%S")
+        desc = payload["event_description"]
+        extra = ""
+        if "plate_number" in payload:
+            plate = payload["plate_number"]
+            status = payload.get("plate_status", "Unknown").lower()
+            extra = f" | {plate} ({status})"
+        elif "face" in payload:
+            face = payload["face"]
+            extra = f" | {face['age']} {face['sex']}"
 
-            # === Console output ===
-            ts = dt.now().strftime("%H:%M:%S")
-            desc = payload["event_description"]
-            extra = ""
-            if "plate_number" in payload:
-                plate = payload["plate_number"]
-                status = payload.get("plate_status", "Unknown").lower()
-                extra = f" | {plate} ({status})"
-            elif "face" in payload:
-                face = payload["face"]
-                extra = f" | {face['age']} {face['sex']}"
+        outputs = " ".join(filter(None, [mqtt_status, webhook_status]))
+        print(f"[{ts}] {desc}{extra} from {client_ip} {outputs}")
 
-            outputs = " ".join(filter(None, [mqtt_status, webhook_status]))
-            print(f"[{ts}] {desc}{extra} from {client_ip} {outputs}")
-
-        except Exception as e:
-            print(f"[{dt.now().strftime('%H:%M:%S')}] ERROR: {e}")
-
-
-class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    daemon_threads = True
-
-
-def get_lan_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("10.255.255.255", 1))
-        return s.getsockname()[0]
-    except Exception:
-        return "127.0.0.1"
-    finally:
-        s.close()
+    return on_event
 
 
 def main():
@@ -510,17 +479,10 @@ def main():
         mqtt_bridge = MQTTBridge(config)
         mqtt_bridge.connect()
 
-    # === HTTP server ===
-    server = ThreadedHTTPServer(("", port), HABridgeHandler)
-    server.bridge_config = config
-    server.mqtt_bridge = mqtt_bridge
-
-    ip = get_lan_ip()
+    # === Print startup info ===
     print(f"\nViewtron → Home Assistant Bridge")
     print(f"{'=' * 50}")
-    print(f"Bridge listening:  http://{ip}:{port}")
 
-    # MQTT status
     if mqtt_bridge:
         print(f"MQTT broker:       {mqtt_config['broker']}:{mqtt_config.get('port', 1883)}")
         print(f"MQTT discovery:    {mqtt_config.get('discovery_prefix', 'homeassistant')}/")
@@ -529,7 +491,6 @@ def main():
     else:
         print(f"MQTT:              disabled")
 
-    # Webhook status
     ha_config = config.get("home_assistant", {})
     webhooks = ha_config.get("webhooks", {})
     if webhooks:
@@ -542,17 +503,25 @@ def main():
 
     print(f"Save images:       {config.get('save_images', True)}")
     print(f"{'=' * 50}")
-    print(f"Ready for Viewtron camera events...\n")
+
+    # === Start server ===
+    def on_connect(client_ip):
+        ts = dt.now().strftime("%H:%M:%S")
+        print(f"[{ts}] Camera connected: {client_ip}")
+
+    server = ViewtronServer(
+        port=port,
+        on_event=make_event_handler(config, mqtt_bridge),
+        on_connect=on_connect,
+    )
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        server.server_close()
         if mqtt_bridge:
             mqtt_bridge.disconnect()
-        print("\nBridge stopped.")
 
 
 if __name__ == "__main__":

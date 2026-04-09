@@ -2,7 +2,7 @@ ARG BUILD_FROM=python:3.12-alpine
 FROM ${BUILD_FROM}
 
 RUN apk add --no-cache py3-yaml && \
-    pip3 install --no-cache-dir --break-system-packages viewtron paho-mqtt requests pyyaml
+    pip3 install --no-cache-dir --break-system-packages viewtron>=1.3.0 paho-mqtt requests pyyaml
 
 COPY run.sh /
 COPY viewtron_bridge.py /
