@@ -15,7 +15,7 @@ Viewtron IP Camera → HTTP POST (XML) → viewtron_bridge.py → MQTT → Home 
 ```
 
 **Example automations:**
-- Garage door opens when your license plate is recognized
+- Private driveway or HOA community gate opens based on authorized plate
 - Phone notification when vehicle arrives with an unknown plate
 - Driveway lights turn on when person detected at night
 - Access control and alarms based on facial recognition
