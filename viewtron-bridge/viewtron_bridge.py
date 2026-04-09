@@ -328,24 +328,9 @@ def build_json_payload(vt_event, alarm_type, client_ip):
     if alarm_type in ("VEHICE", "VEHICLE", "vehicle"):
         payload["plate_number"] = vt_event.get_plate_number()
 
-        # Plate status — IPC uses fixed list types, NVR uses user-defined groups
-        if hasattr(vt_event, "get_group_name"):
-            # NVR v2.0 — show the group name directly
-            group = vt_event.get_group_name()
-            payload["plate_status"] = group if group else "Unknown"
-        elif hasattr(vt_event, "get_vehicle_list_type"):
-            # IPC v1.x — map fixed list types to labels
-            list_type = vt_event.get_vehicle_list_type()
-            if list_type == "whiteList":
-                payload["plate_status"] = "Authorized"
-            elif list_type == "blackList":
-                payload["plate_status"] = "Blacklisted"
-            elif list_type == "temporaryList":
-                payload["plate_status"] = "Temporary"
-            else:
-                payload["plate_status"] = "Unknown"
-        else:
-            payload["plate_status"] = "Unknown"
+        # Plate group — raw value from camera/NVR, application decides meaning
+        plate_group = vt_event.get_plate_group()
+        payload["plate_status"] = plate_group if plate_group else "Unknown"
 
         if hasattr(vt_event, "get_car_brand"):
             car_brand = vt_event.get_car_brand()
