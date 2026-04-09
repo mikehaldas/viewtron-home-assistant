@@ -42,7 +42,7 @@ The **Plate Status** sensor has four possible values:
 | **Temporary** | Plate is on the temporary list and within its valid date range |
 | **Unknown** | Plate is not in the camera's database |
 
-![Viewtron LPR camera dashboard card in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera.jpg)
+![Viewtron LPR camera dashboard card in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera.jpg?v=2)
 
 These are the inputs your Home Assistant automations use. For example, when Plate Status changes to `Authorized`, open the garage door. When it changes to `Unknown`, send a notification.
 
