@@ -15,7 +15,10 @@
 #
 # LPR events add:
 #   trigger.json.plate_number       — detected license plate text
-#   trigger.json.plate_status       — "Authorized", "Blacklisted", or "Unknown"
+#   trigger.json.plate_status       — plate group from the camera or NVR (case-sensitive):
+#                                       IP camera: "whiteList" (allow list), "blackList" (block list),
+#                                       "temporaryList" (temporary vehicle), or "Unknown" (not listed)
+#                                       NVR: your own group name (groups are user-defined), or "Unknown"
 #   trigger.json.vehicle.brand      — vehicle brand, e.g., "Ford" (NVR v2.0 only)
 #   trigger.json.vehicle.color      — vehicle color (NVR v2.0 only)
 #   trigger.json.vehicle.type       — vehicle type, e.g., "sedan" (NVR v2.0 only)
@@ -31,10 +34,12 @@
 #   trigger.json.zone_action        — "entry", "exit", or "loiter" (IPC v1.x zone events)
 
 # ============================================================
-# 1. GARAGE DOOR — Opens when an authorized plate is detected
+# 1. GARAGE DOOR — Opens for allow list and temporary plates
 # ============================================================
-# The Viewtron LPR camera checks the plate against its allow list
-# and sends plate_status: "Authorized" for recognized vehicles.
+# The Viewtron LPR camera checks the plate against its database and sends
+# plate_status: "whiteList" (allow list) or "temporaryList" (temporary
+# vehicle within its date range). Both are let in.
+# NVR users: replace the list with your own NVR group names.
 
 - alias: "LPR: Open garage for authorized plates"
   id: viewtron_lpr_garage
@@ -46,7 +51,7 @@
       local_only: true
   condition:
     - condition: template
-      value_template: "{{ trigger.json.plate_status == 'Authorized' }}"
+      value_template: "{{ trigger.json.plate_status in ['whiteList', 'temporaryList'] }}"
   action:
     - service: cover.open_cover
       target:
@@ -59,7 +64,8 @@
 # ============================================================
 # 2. UNKNOWN VEHICLE ALERT — Notification for unrecognized plates
 # ============================================================
-# Any plate not on the camera's allow list triggers a notification.
+# Any plate that isn't in the camera's or NVR's plate database
+# (plate_status: "Unknown") triggers a notification.
 
 - alias: "LPR: Alert on unknown vehicle"
   id: viewtron_lpr_unknown
@@ -83,7 +89,8 @@
 # ============================================================
 # 3. BLACKLISTED VEHICLE — Alarm for blocked plates
 # ============================================================
-# Plates on the camera's block list trigger an alert.
+# Plates on the camera's block list (plate_status: "blackList") trigger an alert.
+# NVR users: replace 'blackList' with your own NVR group name.
 
 - alias: "LPR: Blacklisted vehicle alert"
   id: viewtron_lpr_blacklisted
@@ -95,7 +102,7 @@
       local_only: true
   condition:
     - condition: template
-      value_template: "{{ trigger.json.plate_status == 'Blacklisted' }}"
+      value_template: "{{ trigger.json.plate_status == 'blackList' }}"
   action:
     - service: notify.mobile_app_your_phone
       data:
@@ -161,6 +168,9 @@
 # ============================================================
 # Uses an input_text helper to display the last plate on a dashboard.
 # Replace switch.gate_opener with your relay/switch entity.
+# Allow list and temporary plates open the gate; block list plates alert;
+# anything else (Unknown) gets the unknown-vehicle notification.
+# NVR users: replace 'whiteList', 'temporaryList' and 'blackList' with your own NVR group names.
 
 - alias: "LPR: Gate access control"
   id: viewtron_lpr_gate
@@ -181,7 +191,7 @@
     - choose:
         - conditions:
             - condition: template
-              value_template: "{{ trigger.json.plate_status == 'Authorized' }}"
+              value_template: "{{ trigger.json.plate_status in ['whiteList', 'temporaryList'] }}"
           sequence:
             - service: switch.turn_on
               target:
@@ -192,7 +202,7 @@
                 entity_id: switch.gate_opener
         - conditions:
             - condition: template
-              value_template: "{{ trigger.json.plate_status == 'Blacklisted' }}"
+              value_template: "{{ trigger.json.plate_status == 'blackList' }}"
           sequence:
             - service: notify.mobile_app_your_phone
               data:
