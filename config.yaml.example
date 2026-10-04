@@ -13,13 +13,13 @@
 #
 # HA receives events as:
 #   MQTT:    sensor.viewtron_<camera>_license_plate, sensor.viewtron_<camera>_status,
-#            binary_sensor.viewtron_<camera>_intrusion, etc.
+#            binary_sensor.viewtron_<camera>_intrusion, sensor.viewtron_<camera>_object_count, etc.
 #   Webhook: trigger.json.plate_number, trigger.json.plate_status, etc.
 
 # Port this bridge listens on (configure your camera to send HTTP Posts here)
 bridge_port: 5002
 
-# Save event images (overview and target crops) to images/
+# Save event images (overview and target crops) to an images/ folder next to this file
 save_images: true
 
 # MQTT with Home Assistant auto-discovery
@@ -31,7 +31,7 @@ mqtt:
   # password: mqtt_pass
   discovery_prefix: homeassistant   # HA default
   topic_prefix: viewtron            # state topics: viewtron/<camera>/<category>
-  expire_after: 30                  # seconds after an event before binary sensors expire (HA shows them as unavailable)
+  off_delay: 30                     # seconds after the last event before binary sensors turn back off
 
 # Webhook output (optional — runs alongside MQTT if configured)
 home_assistant:

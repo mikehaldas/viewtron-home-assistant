@@ -1,5 +1,5 @@
 name: Viewtron Bridge
-version: 1.0.1
+version: 1.1.0
 slug: viewtron-bridge
 description: Receives AI detection events from Viewtron IP cameras (LPR, person/vehicle, face) and delivers them to Home Assistant via MQTT auto-discovery.
 url: https://github.com/mikehaldas/viewtron-home-assistant

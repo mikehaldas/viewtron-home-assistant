@@ -64,26 +64,45 @@ The plate database is managed directly on the camera or NVR — add, remove, and
 | **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Coming soon — zone entry, exit, line crossing, loitering, intrusion detection |
 | **Face Detection** | `binary_sensor.viewtron_*_face_detected` | Coming soon — face recognition with NVR database |
 | **Object Counting** | `sensor.viewtron_*_object_count` | Coming soon — people/vehicle count by line or area |
+| **Object Detection (video metadata)** | `binary_sensor.viewtron_*_object_detected` | Coming soon — person/vehicle seen anywhere in the frame |
 
 LPR is fully tested end-to-end with the Viewtron LPR-IP4 camera. The other detection types use the same bridge architecture and will be documented as testing is completed. All entities auto-discover via MQTT — no manual YAML configuration.
+
+How the other entities behave:
+
+- **Binary sensors** (Intrusion, Face Detected, Object Detected) turn **on** with each event and back **off** 30 seconds after the last one (`off_delay` in `config.yaml`). The event details, including `target_type` (`person`, `car`, `motor`), are attributes.
+- **Object Count** is a number: how many objects the camera has counted since the bridge started, with a per-type breakdown in the `count_by_type` attribute. It uses `state_class: total_increasing`, so Home Assistant statistics and utility meters treat a bridge restart as a reset. Use a utility meter for daily or hourly counts.
+- **Images:** events with pictures also create `image.viewtron_<camera>_intrusion_overview` / `_intrusion_target`, `_face_overview` / `_face_target`, `_counting_overview` / `_counting_target` and `_object_overview` / `_object_target`. They're separate from the LPR **Overview** and **Plate** images, so a person or counting crop never replaces the last plate.
 
 ## Setup
 
 ### Option A: Docker Install (Recommended)
 
-The Docker install handles everything — MQTT config, boot persistence, and the bridge itself — in one command.
+The Docker install handles everything — MQTT config, boot persistence, and the bridge itself. Docker builds the image straight from this repository, so there's nothing to clone.
 
 **Prerequisites:** Docker installed, MQTT broker running (see [MQTT Broker](#mqtt-broker) below if you don't have one).
 
 ```bash
+docker build -t viewtron-bridge \
+  https://github.com/mikehaldas/viewtron-home-assistant.git#main:viewtron-bridge
+
 docker run -d --name viewtron-bridge --restart unless-stopped \
   --network host \
   -e BRIDGE_PORT=5002 \
   -e MQTT_BROKER=localhost \
-  ghcr.io/mikehaldas/viewtron-bridge
+  viewtron-bridge
 ```
 
 The bridge is running. Skip to [Camera Setup](#camera-setup).
+
+To update later, rebuild and recreate the container:
+
+```bash
+docker build --pull --no-cache -t viewtron-bridge \
+  https://github.com/mikehaldas/viewtron-home-assistant.git#main:viewtron-bridge
+docker rm -f viewtron-bridge
+# then run the same docker run command again
+```
 
 **Additional env vars (optional):**
 
@@ -109,12 +128,14 @@ cp config.yaml.example config.yaml
 
 Edit `config.yaml` with your MQTT broker address and desired port, then continue to [Camera Setup](#camera-setup).
 
-To run the bridge after setup:
+To run the bridge after setup (from the `viewtron-home-assistant` folder, where your `config.yaml` is):
 
 ```bash
 source venv/bin/activate
 python3 viewtron-bridge/viewtron_bridge.py
 ```
+
+The bridge prints the config file it loaded on startup. It looks for `config.yaml` in the current folder first, then in the repo folder. To keep the config somewhere else, pass it explicitly: `python3 viewtron-bridge/viewtron_bridge.py --config /path/to/config.yaml` (or set `VIEWTRON_BRIDGE_CONFIG`). Note that `viewtron-bridge/config.yaml` is the Home Assistant add-on manifest, not a bridge config, and the bridge skips it.
 
 To run on boot, create a systemd service:
 
