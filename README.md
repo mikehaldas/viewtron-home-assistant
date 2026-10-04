@@ -26,12 +26,14 @@ Viewtron IP Camera → HTTP POST (XML) → viewtron_bridge.py → MQTT → Home 
 
 When a license plate is detected, four entities appear on the Viewtron IP camera device in Home Assistant:
 
-| Entity | What It Shows | Example |
-|--------|---------------|---------|
-| **License Plate** | The plate number that was read | `ABC1234` |
-| **Status** | The plate's group in the camera's or NVR's database | `whiteList` |
-| **Overview** | Full scene image at the time of detection | JPEG image |
-| **Plate** | Cropped close-up of the license plate | JPEG image |
+| Entity | Entity ID | What It Shows | Example |
+|--------|-----------|---------------|---------|
+| **License Plate** | `sensor.viewtron_<camera>_license_plate` | The plate number that was read | `ABC1234` |
+| **Status** | `sensor.viewtron_<camera>_status` | The plate's group in the camera's or NVR's database | `whiteList` |
+| **Overview** | `image.viewtron_<camera>_overview` | Full scene image at the time of detection | JPEG image |
+| **Plate** | `image.viewtron_<camera>_plate` | Cropped close-up of the license plate | JPEG image |
+
+Home Assistant builds the entity IDs from the device name. The bridge names each device `Viewtron <camera name>` (or just the camera name if it already starts with "Viewtron"), or `Viewtron <camera IP>` if the event doesn't include a camera name. For example, a camera named `Viewtron IPC` gets `sensor.viewtron_ipc_license_plate` and `sensor.viewtron_ipc_status`, and an unnamed camera at 192.168.0.50 gets `sensor.viewtron_192_168_0_50_license_plate`. Check **Settings → Devices & Services → MQTT** for the exact IDs on your system.
 
 The **Status** sensor value depends on whether events come from an IP camera (IPC) or an NVR:
 
@@ -58,10 +60,10 @@ The plate database is managed directly on the camera or NVR — add, remove, and
 
 | Detection | HA Entity | Status |
 |-----------|-----------|--------|
-| **License Plate Recognition (LPR)** | `sensor.viewtron_*_plate` | **Tested and supported** — plate number, plate group (allow list, block list, etc.), vehicle brand/color/type |
+| **License Plate Recognition (LPR)** | `sensor.viewtron_*_license_plate`, `sensor.viewtron_*_status` | **Tested and supported** — plate number, plate group (allow list, block list, etc.), vehicle brand/color/type |
 | **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Coming soon — zone entry, exit, line crossing, loitering, intrusion detection |
-| **Face Detection** | `binary_sensor.viewtron_*_face` | Coming soon — face recognition with NVR database |
-| **Object Counting** | `sensor.viewtron_*_counting` | Coming soon — people/vehicle count by line or area |
+| **Face Detection** | `binary_sensor.viewtron_*_face_detected` | Coming soon — face recognition with NVR database |
+| **Object Counting** | `sensor.viewtron_*_object_count` | Coming soon — people/vehicle count by line or area |
 
 LPR is fully tested end-to-end with the Viewtron LPR-IP4 camera. The other detection types use the same bridge architecture and will be documented as testing is completed. All entities auto-discover via MQTT — no manual YAML configuration.
 
@@ -300,15 +302,23 @@ See [`example_automations.yaml`](example_automations.yaml) for ready-to-use HA a
 ```yaml
 - alias: "Alert on unknown vehicle"
   trigger:
+    # Fires on every plate read (the timestamp changes with each event),
+    # so two unknown vehicles in a row each send an alert
     - platform: state
-      entity_id: sensor.viewtron_ipc_plate_status
-      to: "Unknown"
+      entity_id: sensor.viewtron_ipc_status
+      attribute: timestamp
+  condition:
+    - condition: state
+      entity_id: sensor.viewtron_ipc_status
+      state: "Unknown"
   action:
     - service: notify.mobile_app_phone
       data:
         title: "Unknown vehicle"
-        message: "Plate {{ states('sensor.viewtron_ipc_plate') }} detected"
+        message: "Plate {{ states('sensor.viewtron_ipc_license_plate') }} detected"
 ```
+
+Swap `viewtron_ipc` for your own camera's entity ID prefix (see [What Home Assistant Receives](#what-home-assistant-receives)). A plain `to: "Unknown"` trigger only fires when the status changes, so it would miss the second of two unknown vehicles in a row.
 
 ## Compatible Cameras
 
