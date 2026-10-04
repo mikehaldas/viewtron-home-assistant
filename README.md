@@ -29,20 +29,20 @@ When a license plate is detected, four entities appear on the Viewtron IP camera
 | Entity | What It Shows | Example |
 |--------|---------------|---------|
 | **License Plate** | The plate number that was read | `ABC1234` |
-| **Status** | Whether the plate is in the camera's database | `Authorized` |
+| **Status** | The plate's group in the camera's or NVR's database | `whiteList` |
 | **Overview** | Full scene image at the time of detection | JPEG image |
 | **Plate** | Cropped close-up of the license plate | JPEG image |
 
 The **Status** sensor value depends on whether events come from an IP camera (IPC) or an NVR:
 
-**IPC (camera direct)** — fixed status values:
+**IPC (camera direct)** — fixed status values, sent exactly as the camera reports them (case-sensitive):
 
-| Status | Meaning |
-|--------|---------|
-| **Authorized** | Plate is on the camera's allow list |
-| **Blacklisted** | Plate is on the camera's block list |
-| **Temporary** | Plate is on the temporary list and within its valid date range |
-| **Unknown** | Plate is not in the camera's database |
+| Status | Camera UI label | Meaning |
+|--------|-----------------|---------|
+| `whiteList` | Allow list | Plate is on the camera's allow list |
+| `blackList` | Block list | Plate is on the camera's block list |
+| `temporaryList` | Temporary vehicle | Plate is on the temporary list and within its valid date range |
+| `Unknown` | — | Plate is not in the camera's database, or is a temporary plate outside its date range |
 
 **NVR** — user-defined plate group names:
 
@@ -50,7 +50,7 @@ The NVR lets you create custom plate groups (e.g., "Whitelist", "Residents", "De
 
 ![Viewtron LPR camera dashboard card in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera.jpg?v=2)
 
-These are the inputs your Home Assistant automations use. For example, when Status changes to `Authorized` (IPC) or your group name (NVR), open the gate. When it changes to `Unknown`, send a notification.
+These are the inputs your Home Assistant automations use. For example, when Status changes to `whiteList` (IPC) or your group name (NVR), open the gate. When it changes to `Unknown`, send a notification.
 
 The plate database is managed directly on the camera or NVR — add, remove, and organize plates through the web interface. See [License Plate Database Setup](#3-license-plate-database-setup-optional) below for instructions.
 
@@ -58,7 +58,7 @@ The plate database is managed directly on the camera or NVR — add, remove, and
 
 | Detection | HA Entity | Status |
 |-----------|-----------|--------|
-| **License Plate Recognition (LPR)** | `sensor.viewtron_*_plate` | **Tested and supported** — plate number, authorized/not authorized, vehicle brand/color/type |
+| **License Plate Recognition (LPR)** | `sensor.viewtron_*_plate` | **Tested and supported** — plate number, plate group (allow list, block list, etc.), vehicle brand/color/type |
 | **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Coming soon — zone entry, exit, line crossing, loitering, intrusion detection |
 | **Face Detection** | `binary_sensor.viewtron_*_face` | Coming soon — face recognition with NVR database |
 | **Object Counting** | `sensor.viewtron_*_counting` | Coming soon — people/vehicle count by line or area |
@@ -214,7 +214,7 @@ On the Vehicle Information screen, enter the license plate number and select **A
 
 ![Add license plate to database](https://videos.cctvcamerapros.com/wp-content/files/add-license-plate-database.jpg)
 
-Plates on the allow list will show as `Authorized` in Home Assistant. You can also manage plates programmatically via the [viewtron Python SDK](https://github.com/mikehaldas/viewtron-python-sdk):
+Plates on the allow list will show as `whiteList` in Home Assistant (block list plates show as `blackList`, temporary vehicles as `temporaryList`). You can also manage plates programmatically via the [viewtron Python SDK](https://github.com/mikehaldas/viewtron-python-sdk):
 
 ```python
 from viewtron import ViewtronCamera
@@ -288,7 +288,7 @@ See [`example_automations.yaml`](example_automations.yaml) for ready-to-use HA a
       local_only: true
   condition:
     - condition: template
-      value_template: "{{ trigger.json.plate_status == 'Authorized' }}"
+      value_template: "{{ trigger.json.plate_status == 'whiteList' }}"  # NVR: use your group name
   action:
     - service: cover.open_cover
       target:
