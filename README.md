@@ -78,31 +78,29 @@ How the other entities behave:
 
 ### Option A: Docker Install (Recommended)
 
-The Docker install handles everything — MQTT config, boot persistence, and the bridge itself. Docker builds the image straight from this repository, so there's nothing to clone.
+The Docker install handles everything — MQTT config, boot persistence, and the bridge itself. It uses the published image, so there's nothing to clone or build.
 
 **Prerequisites:** Docker installed, MQTT broker running (see [MQTT Broker](#mqtt-broker) below if you don't have one).
 
 ```bash
-docker build -t viewtron-bridge \
-  https://github.com/mikehaldas/viewtron-home-assistant.git#main:viewtron-bridge
-
 docker run -d --name viewtron-bridge --restart unless-stopped \
   --network host \
   -e BRIDGE_PORT=5002 \
   -e MQTT_BROKER=localhost \
-  viewtron-bridge
+  ghcr.io/mikehaldas/viewtron-bridge:latest
 ```
 
 The bridge is running. Skip to [Camera Setup](#camera-setup).
 
-To update later, rebuild and recreate the container:
+To update later, pull the new image and recreate the container:
 
 ```bash
-docker build --pull --no-cache -t viewtron-bridge \
-  https://github.com/mikehaldas/viewtron-home-assistant.git#main:viewtron-bridge
+docker pull ghcr.io/mikehaldas/viewtron-bridge:latest
 docker rm -f viewtron-bridge
 # then run the same docker run command again
 ```
+
+To build the image yourself instead, run `docker build -t viewtron-bridge https://github.com/mikehaldas/viewtron-home-assistant.git#main:viewtron-bridge` and use `viewtron-bridge` as the image name in the `docker run` command.
 
 **Additional env vars (optional):**
 
