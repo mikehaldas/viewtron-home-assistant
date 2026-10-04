@@ -50,7 +50,7 @@ The NVR lets you create custom plate groups (e.g., "Whitelist", "Residents", "De
 
 ![Viewtron LPR camera dashboard card in Home Assistant](https://videos.cctvcamerapros.com/wp-content/files/home-assistant-LPR-camera.jpg?v=2)
 
-These are the inputs your Home Assistant automations use. For example, when Status changes to `whiteList` (IPC) or your group name (NVR), open the gate. When it changes to `Unknown`, send a notification.
+These are the inputs your Home Assistant automations use. For example, when Status changes to `whiteList` or `temporaryList` (IPC) or your group name (NVR), open the gate. When it changes to `Unknown`, send a notification.
 
 The plate database is managed directly on the camera or NVR — add, remove, and organize plates through the web interface. See [License Plate Database Setup](#3-license-plate-database-setup-optional) below for instructions.
 
@@ -288,7 +288,7 @@ See [`example_automations.yaml`](example_automations.yaml) for ready-to-use HA a
       local_only: true
   condition:
     - condition: template
-      value_template: "{{ trigger.json.plate_status == 'whiteList' }}"  # NVR: use your group name
+      value_template: "{{ trigger.json.plate_status in ['whiteList', 'temporaryList'] }}"  # NVR: use your group names
   action:
     - service: cover.open_cover
       target:
