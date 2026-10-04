@@ -1,0 +1,91 @@
+name: Bridge image
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  test:
+    name: Build and smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t viewtron-bridge:test viewtron-bridge
+
+      - name: Build the way older Home Assistant Supervisors do
+        # Older Supervisors pass BUILD_FROM with a base image that has no
+        # Python. The Dockerfile must ignore it and still build.
+        run: >
+          docker build -t viewtron-bridge:addon
+          --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
+          viewtron-bridge
+
+      - name: Start MQTT broker
+        run: |
+          docker run -d --name mqtt --network host eclipse-mosquitto:2 \
+            mosquitto -c /mosquitto-no-auth.conf
+          sleep 2
+
+      - name: Smoke test, standalone Docker mode
+        run: |
+          docker run -d --name standalone --network host \
+            -e BRIDGE_PORT=5002 -e MQTT_BROKER=127.0.0.1 \
+            -e MQTT_USERNAME= -e MQTT_PASSWORD='quote " and # test' \
+            viewtron-bridge:test
+          ./.github/smoke-test.sh 5002 standalone 127.0.0.2
+
+      - name: Smoke test, Home Assistant add-on mode
+        run: |
+          mkdir -p addon-data
+          cat > addon-data/options.json <<'JSON'
+          {"bridge_port": 5003, "mqtt_broker": "127.0.0.1", "mqtt_port": 1883,
+           "mqtt_username": "", "mqtt_password": "", "save_images": false}
+          JSON
+          docker run -d --name addon --network host \
+            -v "$PWD/addon-data:/data" viewtron-bridge:addon
+          ./.github/smoke-test.sh 5003 addon 127.0.0.3
+
+      - name: Container logs
+        if: always()
+        run: |
+          for c in standalone addon; do
+            echo "=== $c"; docker logs "$c" 2>&1 || true
+          done
+
+  publish:
+    name: Publish image
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/viewtron-bridge
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: viewtron-bridge
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
