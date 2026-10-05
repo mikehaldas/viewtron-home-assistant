@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+
       - name: Build image
         run: docker build -t viewtron-bridge:test viewtron-bridge
 

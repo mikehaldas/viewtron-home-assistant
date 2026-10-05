@@ -17,6 +17,7 @@ ENV PYTHONUNBUFFERED=1
 LABEL org.opencontainers.image.title="Viewtron Bridge" \
       org.opencontainers.image.description="Viewtron IP camera AI events to Home Assistant via MQTT" \
       org.opencontainers.image.source="https://github.com/mikehaldas/viewtron-home-assistant" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="1.1.1"
 
 CMD [ "/run.sh" ]
