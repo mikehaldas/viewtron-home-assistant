@@ -168,10 +168,10 @@ The bridge requires an MQTT broker. If you already have Mosquitto running (most 
 
 **HAOS users (Home Assistant OS):**
 
-1. Go to **Settings → Add-ons → Add-on Store** (bottom right)
+1. Go to **Settings → Apps** (on Home Assistant versions before 2026.2 this was **Settings → Add-ons → Add-on Store**)
 2. Search for **Mosquitto broker** and click **Install**
 3. Click **Start**
-4. Go to **Settings → Devices & Services** — HA will auto-discover the Mosquitto add-on and prompt you to configure MQTT
+4. Go to **Settings → Devices & Services** — HA will auto-discover the Mosquitto app and prompt you to configure MQTT
 
 **Docker / Linux HA users:**
 
@@ -247,17 +247,19 @@ camera.modify_plate("ABC1234", owner="Mike")
 
 ### 4. Configure the HTTP Post Webhook Server
 
-In the camera's web interface, go to **Network > Advanced > HTTP Notification**.
+In the camera's web interface, open **Network**. The Network landing page lists this feature as **HTTP POST**. Once opened, the breadcrumb is **Network > Advanced**, and the tab or edit dialog may be labeled **HTTP Notification** or **HTTP POST**, depending on the camera firmware. On an NVR, use **Network > HTTP POST** (or **Integration > HTTP POST** in the sidebar).
 
 ![Viewtron camera HTTP POST settings](https://videos.cctvcamerapros.com/wp-content/files/IP-camera-HTTP-Post-Settings.jpg)
 
 Set the **Push Protocol Version** to **V1**, then click **Add** to create a server entry.
 
-> **Important:** You must select **V1** for Push Protocol Version. V2 sends alarm status events but images don't come through reliably.
+> **Important:** You must select **V1** for Push Protocol Version. V2 sends alarm status events but images don't come through reliably. Home Assistant needs the pictures for the Overview and Plate entities.
 
 Click **Edit**, then **Add** and configure the server connection:
 
 ![HTTP POST server configuration](https://videos.cctvcamerapros.com/wp-content/files/IP-camera-HTTP-Post-Server.jpg)
+
+*Note: the screenshot above is an example edit dialog. It shows port `15002` and leaves **Original picture** / **Target picture** unchecked. Use the table below for Home Assistant: port `5002` (or your `BRIDGE_PORT`) and both picture options checked.*
 
 | Setting | Value |
 |---------|-------|
