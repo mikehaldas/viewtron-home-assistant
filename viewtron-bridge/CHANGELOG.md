@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.1.1
+
+- License plate events from an IP camera reach Home Assistant when the
+  installed viewtron package has no `get_plate_group()`. viewtron 1.3.0
+  exposes `get_vehicle_list_type()` instead (`whiteList`, `blackList`,
+  `temporaryList`, or none). The bridge uses `get_plate_group()` when it
+  exists and `get_vehicle_list_type()` otherwise, so the plate is published
+  instead of raising `AttributeError`.
+- The viewtron requirement stays at 1.3.1 or newer. 1.3.1 is the latest
+  release on PyPI, and its NVR license plate events include
+  `get_plate_group()` (the NVR's plate group name).
+- Tested against a Viewtron LPR camera. The plate, status, and both images
+  reached Home Assistant.
+
 ## 1.1.0
 
 - The first face, intrusion or counting event from a new camera now shows up

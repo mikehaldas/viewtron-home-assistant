@@ -554,8 +554,14 @@ def build_json_payload(vt_event, alarm_type, client_ip):
     if alarm_type in ("VEHICE", "VEHICLE", "vehicle"):
         payload["plate_number"] = vt_event.get_plate_number()
 
-        # Plate group — raw value from camera/NVR, application decides meaning
-        plate_group = vt_event.get_plate_group()
+        # Plate group — raw value from camera/NVR, application decides meaning.
+        # viewtron 1.3.1+ has get_plate_group() (IPC list type, or the NVR's
+        # group name). IP camera events on 1.3.0 only have
+        # get_vehicle_list_type() (whiteList, blackList, temporaryList, or None).
+        get_group = getattr(vt_event, "get_plate_group", None)
+        if get_group is None:
+            get_group = getattr(vt_event, "get_vehicle_list_type", None)
+        plate_group = get_group() if get_group else None
         payload["plate_status"] = plate_group if plate_group else "Unknown"
 
         if hasattr(vt_event, "get_car_brand"):
