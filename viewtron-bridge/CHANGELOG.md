@@ -8,7 +8,7 @@
   `vehicle_brand`, `vehicle_type`, and `vehicle_model`. Existing entity
   names, MQTT topics, and attributes are unchanged, including the plate
   group on the Status sensor and the console label such as
-  `AIDRIVE (blacklist)`.
+  `IB36NL (whitelist)`.
 - The event `timestamp` is the camera's event time. viewtron 1.4.0 reads
   `currentTime` as seconds, milliseconds, or microseconds.
 - Require viewtron 1.4.0 or newer.

@@ -627,7 +627,7 @@ def lpr_attribute_fields(vt_event):
 
 
 def format_plate_label(payload):
-    """Console label for a plate event, e.g. ``AIDRIVE (blacklist)``."""
+    """Console label for a plate event, e.g. ``IB36NL (whitelist)``."""
     plate = payload["plate_number"]
     status = payload.get("plate_status", "Unknown").lower()
     return f"{plate} ({status})"

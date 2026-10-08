@@ -67,12 +67,12 @@ Entity names and MQTT topics are unchanged. A plate event's JSON includes the fi
 | `plate_list` | `whiteList` | `whiteList` (allow list), `blackList` (block list), `temporaryList`, `strangerList`, or none. An NVR group is copied here only when its name is one of those lists, ignoring capitalization. A custom name such as `Residents` stays on Status (`plate_status`) and this attribute is none. |
 | `direction` | `approach` | `approach` or `away`. None when the camera does not send a direction. A camera value of `leave` is reported as `away`. |
 | `confidence` | `99.0` | Detection confidence from 0 to 100. None when the camera does not send one. |
-| `vehicle_color` | `grey` | Vehicle color, when the camera sends it |
-| `vehicle_brand` | `Tesla` | Vehicle brand, when the camera sends it |
+| `vehicle_color` | `white` | Vehicle color, when the camera sends it |
+| `vehicle_brand` | `TestBrand` | Vehicle brand, when the camera sends it |
 | `vehicle_type` | `saloon car` | Vehicle type, when the camera sends it |
-| `vehicle_model` | `Tesla_ModelS` | Vehicle model, when the camera sends it |
+| `vehicle_model` | `TestModel` | Vehicle model, when the camera sends it |
 
-`plate_status` is still the raw group name described above (`whiteList`, `blackList`, `temporaryList`, `strangerList`, an NVR group name, or `Unknown`). The console log still prints that group in lowercase parentheses, for example `AIDRIVE (blacklist)`.
+`plate_status` is still the raw group name described above (`whiteList`, `blackList`, `temporaryList`, `strangerList`, an NVR group name, or `Unknown`). The console log still prints that group in lowercase parentheses, for example `IB36NL (whitelist)`.
 
 NVR plate events that include a vehicle brand also still include `vehicle.brand`, `vehicle.color`, `vehicle.type`, `vehicle.model`, and `plate_color`.
 
