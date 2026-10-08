@@ -4,8 +4,19 @@
 # Pinning the base keeps the add-on build and a plain `docker build` identical.
 FROM python:3.12-alpine
 
-RUN pip3 install --no-cache-dir --break-system-packages \
-    "viewtron>=1.3.1" "paho-mqtt>=2.0" requests pyyaml
+# viewtron 1.4.0 adds plate direction, confidence, list, vehicle
+# attributes, and camera event timestamps. VIEWTRON_SPEC can be a git
+# URL when that release is not on PyPI yet. A normal build uses the pin.
+ARG VIEWTRON_SPEC="viewtron>=1.4.0"
+RUN set -eu; \
+    need_git=0; \
+    case "$VIEWTRON_SPEC" in \
+      *git+*|*github.com*) need_git=1 ;; \
+    esac; \
+    if [ "$need_git" -eq 1 ]; then apk add --no-cache --virtual .viewtron-git git; fi; \
+    pip3 install --no-cache-dir --break-system-packages \
+        "$VIEWTRON_SPEC" "paho-mqtt>=2.0" requests pyyaml; \
+    if [ "$need_git" -eq 1 ]; then apk del .viewtron-git; fi
 
 COPY run.sh /
 COPY viewtron_bridge.py /

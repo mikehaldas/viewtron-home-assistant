@@ -15,11 +15,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Python dependencies
+        # viewtron 1.4.0 is not always on PyPI yet. install-viewtron.sh
+        # uses the release when it is published and the SDK branch otherwise.
+        run: |
+          python3 -m venv .venv
+          spec="$(./.github/install-viewtron.sh)"
+          echo "VIEWTRON_SPEC=${spec}" >> "$GITHUB_ENV"
+          .venv/bin/pip install "$spec" 'paho-mqtt>=2.0' 'PyYAML>=6.0' 'requests>=2.28'
+
       - name: Unit tests
-        run: python3 -m unittest discover -s tests -v
+        run: .venv/bin/python -m unittest discover -s tests -v
 
       - name: Build image
-        run: docker build -t viewtron-bridge:test viewtron-bridge
+        run: docker build -t viewtron-bridge:test --build-arg VIEWTRON_SPEC="$VIEWTRON_SPEC" viewtron-bridge
 
       - name: Build the way older Home Assistant Supervisors do
         # Older Supervisors pass BUILD_FROM with a base image that has no
@@ -27,6 +36,7 @@ jobs:
         run: >
           docker build -t viewtron-bridge:addon
           --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
+          --build-arg VIEWTRON_SPEC="$VIEWTRON_SPEC"
           viewtron-bridge
 
       - name: Start MQTT broker

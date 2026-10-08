@@ -1,4 +1,6 @@
-viewtron>=1.3.1
+# 1.4.0 adds plate direction, confidence, list, vehicle attributes,
+# and camera event timestamps.
+viewtron>=1.4.0
 paho-mqtt>=2.0
 PyYAML>=6.0
 requests>=2.28

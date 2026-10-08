@@ -21,14 +21,14 @@ Webhook mode:
 Both modes can run simultaneously.
 
 Setup:
-    1. pip install viewtron paho-mqtt pyyaml requests
+    1. pip install -r requirements.txt   # includes viewtron 1.4.0 or newer
     2. Copy config.yaml.example to config.yaml and configure
     3. Point your camera/NVR HTTP Post at this bridge's IP and port
     4. Run: python3 viewtron-bridge/viewtron_bridge.py
        (from the folder that holds your config.yaml), or
        python3 viewtron_bridge.py --config /path/to/config.yaml
 
-Requires: pip install viewtron paho-mqtt pyyaml requests
+Requires: viewtron 1.4.0 or newer, paho-mqtt, pyyaml, requests
 
 Written by Mike Haldas
 mike@cctvcamerapros.net
@@ -62,6 +62,22 @@ DISCOVERY_SETTLE_SECONDS = 2.0
 
 # IPC v1.x numeric target types. NVR v2.0 events already use names.
 TARGET_TYPES_V1 = {"1": "person", "2": "car", "4": "motor"}
+
+# Raw alarm names that are license plate events. Matching ignores case so a
+# post the SDK accepts as LPR still fills the plate attributes.
+PLATE_ALARM_TYPES = {"vehice", "vehicle"}
+
+# viewtron 1.4.0 plate fields. Published as MQTT/HA attributes next to the
+# existing plate_number and plate_status keys.
+PLATE_ATTRIBUTES = (
+    "direction",
+    "confidence",
+    "plate_list",
+    "vehicle_color",
+    "vehicle_brand",
+    "vehicle_type",
+    "vehicle_model",
+)
 
 
 def is_addon_manifest(data):
@@ -533,6 +549,38 @@ class MQTTBridge:
 
 # ====================== SHARED FUNCTIONS ======================
 
+def is_plate_event(vt_event, alarm_type):
+    """True for an IPC LPR or NVR vehicle plate event."""
+    if getattr(vt_event, "category", None) == "lpr":
+        return True
+    return str(alarm_type or "").strip().casefold() in PLATE_ALARM_TYPES
+
+
+def plate_log_suffix(payload):
+    """Console text for a plate read, e.g. `` | AIDRIVE (blacklist)``.
+
+    Uses the existing list label: the plate number and the lowercased
+    plate group (``plate_status``).
+    """
+    if "plate_number" not in payload:
+        return ""
+    status = str(payload.get("plate_status") or "Unknown").lower()
+    return f" | {payload['plate_number']} ({status})"
+
+
+def event_time_for_filename(timestamp_str):
+    """Camera event time as ``YYYYMMDD_HHMMSS``, or the local time if it
+    is not a timestamp string."""
+    match = re.fullmatch(
+        r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?",
+        str(timestamp_str or "").strip(),
+    )
+    if not match:
+        return dt.now().strftime("%Y%m%d_%H%M%S")
+    year, month, day, hour, minute, second = match.groups()
+    return f"{year}{month}{day}_{hour}{minute}{second}"
+
+
 def build_json_payload(vt_event, alarm_type, client_ip):
     """Convert a parsed viewtron.py event object to a JSON-serializable dict."""
     payload = {
@@ -540,6 +588,9 @@ def build_json_payload(vt_event, alarm_type, client_ip):
         "event_description": vt_event.get_alarm_description(),
         "camera_name": vt_event.get_ip_cam(),
         "camera_ip": client_ip,
+        # Camera event time. viewtron 1.4.0 reads currentTime as seconds,
+        # milliseconds, or microseconds, so this is the time on the camera
+        # rather than the moment the bridge parsed the post.
         "timestamp": vt_event.get_time_stamp_formatted(),
     }
 
@@ -550,8 +601,11 @@ def build_json_payload(vt_event, alarm_type, client_ip):
     if target_type:
         payload["target_type"] = target_type
 
-    # LPR fields
-    if alarm_type in ("VEHICE", "VEHICLE", "vehicle"):
+    # LPR fields. plate_status stays the raw camera or NVR group
+    # ("blackList", a custom name such as "Residents", or "Unknown").
+    # viewtron 1.4.0 also sets direction, confidence, plate_list, and
+    # vehicle_color / vehicle_brand / vehicle_type / vehicle_model.
+    if is_plate_event(vt_event, alarm_type):
         payload["plate_number"] = vt_event.get_plate_number()
 
         # Plate group — raw value from camera/NVR, application decides meaning.
@@ -563,6 +617,10 @@ def build_json_payload(vt_event, alarm_type, client_ip):
             get_group = getattr(vt_event, "get_vehicle_list_type", None)
         plate_group = get_group() if get_group else None
         payload["plate_status"] = plate_group if plate_group else "Unknown"
+
+        for name in PLATE_ATTRIBUTES:
+            if hasattr(vt_event, name):
+                payload[name] = getattr(vt_event, name)
 
         if hasattr(vt_event, "get_car_brand"):
             car_brand = vt_event.get_car_brand()
@@ -602,7 +660,7 @@ def save_event_images(vt_event, alarm_type, timestamp_str):
     """Save event images to disk. Returns dict of saved file paths."""
     saved = {}
     os.makedirs(IMG_DIR, exist_ok=True)
-    ts = dt.now().strftime("%Y%m%d_%H%M%S")
+    ts = event_time_for_filename(timestamp_str)
 
     for img_type, get_bytes in [
         ("overview", vt_event.get_source_image_bytes),
@@ -719,16 +777,13 @@ def make_event_handler(config, mqtt_bridge):
         # === Console output ===
         ts = dt.now().strftime("%H:%M:%S")
         desc = payload["event_description"]
-        extra = ""
-        if "plate_number" in payload:
-            plate = payload["plate_number"]
-            status = payload.get("plate_status", "Unknown").lower()
-            extra = f" | {plate} ({status})"
-        elif "face" in payload:
-            face = payload["face"]
-            extra = f" | {face['age']} {face['sex']}"
-        elif "count" in payload:
-            extra = f" | count {payload['count']}"
+        extra = plate_log_suffix(payload)
+        if not extra:
+            if "face" in payload:
+                face = payload["face"]
+                extra = f" | {face['age']} {face['sex']}"
+            elif "count" in payload:
+                extra = f" | count {payload['count']}"
         if "target_type" in payload and "plate_number" not in payload:
             extra += f" | {payload['target_type']}"
 

@@ -11,18 +11,27 @@
 #   trigger.json.event_description  — human-readable description
 #   trigger.json.camera_name        — camera device name
 #   trigger.json.camera_ip          — camera IP address
-#   trigger.json.timestamp          — event timestamp
+#   trigger.json.timestamp          — camera event time
 #
 # LPR events add:
 #   trigger.json.plate_number       — detected license plate text
 #   trigger.json.plate_status       — plate group from the camera or NVR (case-sensitive):
 #                                       IP camera: "whiteList" (allow list), "blackList" (block list),
-#                                       "temporaryList" (temporary vehicle), or "Unknown" (not listed)
+#                                       "temporaryList" (temporary vehicle), "strangerList",
+#                                       or "Unknown" (not listed)
 #                                       NVR: your own group name (groups are user-defined), or "Unknown"
-#   trigger.json.vehicle.brand      — vehicle brand, e.g., "Ford" (NVR v2.0 only)
-#   trigger.json.vehicle.color      — vehicle color (NVR v2.0 only)
-#   trigger.json.vehicle.type       — vehicle type, e.g., "sedan" (NVR v2.0 only)
-#   trigger.json.vehicle.model      — vehicle model (NVR v2.0 only)
+#   trigger.json.direction          — "approach", "away", or null (a camera value of "leave" is "away")
+#   trigger.json.confidence         — detection score from 0 to 100, for example 99.0, or null
+#   trigger.json.plate_list         — "whiteList", "blackList", "temporaryList", "strangerList", or null
+#                                       A custom NVR group stays on plate_status and plate_list is null
+#   trigger.json.vehicle_color      — vehicle color, or null
+#   trigger.json.vehicle_brand      — vehicle brand, or null
+#   trigger.json.vehicle_type       — vehicle type, or null
+#   trigger.json.vehicle_model      — vehicle model, or null
+#   trigger.json.vehicle.brand      — vehicle brand, e.g., "Ford" (NVR events that include a brand)
+#   trigger.json.vehicle.color      — vehicle color (NVR events that include a brand)
+#   trigger.json.vehicle.type       — vehicle type, e.g., "sedan" (NVR events that include a brand)
+#   trigger.json.vehicle.model      — vehicle model (NVR events that include a brand)
 #
 # Face events add:
 #   trigger.json.face.age           — estimated age
@@ -213,3 +222,55 @@
           data:
             title: "Unknown vehicle at gate"
             message: "{{ trigger.json.plate_number }}"
+
+# ============================================================
+# 7. GATE — Allow list, approaching, confidence at least 90
+# ============================================================
+# Opens a gate only when the plate is on the allow list, the vehicle is
+# approaching, and the read confidence is 90 or higher.
+
+- alias: "LPR: Open gate for an approaching allow-list plate"
+  id: viewtron_lpr_gate_approach
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-lpr
+      allowed_methods:
+        - POST
+      local_only: true
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.json.plate_list == 'whiteList'
+           and trigger.json.direction == 'approach'
+           and trigger.json.confidence | float(0) >= 90 }}
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.gate_opener
+    - delay: "00:00:03"
+    - service: switch.turn_off
+      target:
+        entity_id: switch.gate_opener
+
+# ============================================================
+# 8. BLOCK LIST — Alert when the plate is on the block list
+# ============================================================
+
+- alias: "LPR: Alert on a block-list plate"
+  id: viewtron_lpr_block_list
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-lpr
+      allowed_methods:
+        - POST
+      local_only: true
+  condition:
+    - condition: template
+      value_template: "{{ trigger.json.plate_list == 'blackList' }}"
+  action:
+    - service: notify.mobile_app_your_phone
+      data:
+        title: "Block-list plate"
+        message: >-
+          Plate {{ trigger.json.plate_number }} is on the block list.
+          Camera: {{ trigger.json.camera_name }}

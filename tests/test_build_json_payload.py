@@ -23,7 +23,11 @@ _stub("requests")
 _stub("yaml", safe_load=lambda *args, **kwargs: {})
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "viewtron-bridge"))
-from viewtron_bridge import build_json_payload  # noqa: E402
+from viewtron_bridge import (  # noqa: E402
+    build_json_payload,
+    event_time_for_filename,
+    plate_log_suffix,
+)
 
 
 class Event:
@@ -89,6 +93,95 @@ class BuildJsonPayloadLprTests(unittest.TestCase):
         payload = build_json_payload(event, "PEA", "192.0.2.10")
         self.assertNotIn("plate_number", payload)
         self.assertNotIn("plate_status", payload)
+        self.assertNotIn("direction", payload)
+        self.assertNotIn("plate_list", payload)
+
+    def test_old_event_without_new_attributes_is_unchanged(self):
+        event = Event(get_plate_group=lambda: "blackList")
+        payload = build_json_payload(event, "VEHICE", "192.0.2.10")
+        self.assertEqual(payload["plate_status"], "blackList")
+        self.assertNotIn("direction", payload)
+        self.assertNotIn("confidence", payload)
+        self.assertNotIn("plate_list", payload)
+        self.assertNotIn("vehicle", payload)
+
+    def test_plate_attributes_are_copied_including_null(self):
+        event = Event(get_plate_group=lambda: "whiteList")
+        event.direction = "approach"
+        event.confidence = 0.0
+        event.plate_list = "whiteList"
+        event.vehicle_color = None
+        event.vehicle_brand = None
+        event.vehicle_type = None
+        event.vehicle_model = None
+        payload = build_json_payload(event, "VEHICLE", "192.0.2.10")
+        self.assertEqual(payload["direction"], "approach")
+        self.assertEqual(payload["confidence"], 0.0)
+        self.assertEqual(payload["plate_list"], "whiteList")
+        self.assertIsNone(payload["vehicle_color"])
+        self.assertNotIn("vehicle", payload)
+
+    def test_lowercase_alarm_type_still_includes_plate_fields(self):
+        event = Event(get_vehicle_list_type=lambda: "temporaryList")
+        event.plate_list = "temporaryList"
+        event.direction = "away"
+        payload = build_json_payload(event, "vehice", "192.0.2.10")
+        self.assertEqual(payload["plate_status"], "temporaryList")
+        self.assertEqual(payload["direction"], "away")
+
+    def test_lpr_category_includes_plate_fields(self):
+        event = Event(get_plate_group=lambda: "blackList")
+        event.category = "lpr"
+        event.plate_list = "blackList"
+        payload = build_json_payload(event, "other", "192.0.2.10")
+        self.assertEqual(payload["plate_number"], "ABC1234")
+        self.assertEqual(payload["plate_list"], "blackList")
+
+    def test_nvr_group_name_and_vehicle_object_stay(self):
+        event = Event(
+            get_plate_group=lambda: "Residents",
+            get_car_brand=lambda: "GMC",
+            get_car_type=lambda: "mpv",
+            get_car_color=lambda: "white",
+            get_car_model=lambda: "GMC_SAVANA",
+            get_plate_color=lambda: "blue",
+        )
+        event.direction = None
+        event.confidence = None
+        event.plate_list = None
+        event.vehicle_color = "white"
+        event.vehicle_brand = "GMC"
+        event.vehicle_type = "mpv"
+        event.vehicle_model = "GMC_SAVANA"
+        payload = build_json_payload(event, "vehicle", "192.0.2.10")
+        self.assertEqual(payload["plate_status"], "Residents")
+        self.assertIsNone(payload["plate_list"])
+        self.assertEqual(payload["vehicle_brand"], "GMC")
+        self.assertEqual(payload["vehicle"], {
+            "type": "mpv",
+            "color": "white",
+            "brand": "GMC",
+            "model": "GMC_SAVANA",
+        })
+        self.assertEqual(payload["plate_color"], "blue")
+        self.assertEqual(plate_log_suffix(payload), " | ABC1234 (residents)")
+
+    def test_block_list_log_label(self):
+        event = Event(get_plate_group=lambda: "blackList")
+        event.plate_list = "blackList"
+        payload = build_json_payload(event, "VEHICE", "192.0.2.10")
+        payload["plate_number"] = "AIDRIVE"
+        self.assertEqual(plate_log_suffix(payload), " | AIDRIVE (blacklist)")
+
+    def test_image_filename_uses_camera_event_time(self):
+        self.assertEqual(
+            event_time_for_filename("2026-10-07 21:24:47.427999"),
+            "20261007_212447",
+        )
+        self.assertEqual(
+            event_time_for_filename("2026-10-07T21:24:47"),
+            "20261007_212447",
+        )
 
 
 if __name__ == "__main__":

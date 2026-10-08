@@ -44,6 +44,7 @@ The **Status** sensor value depends on whether events come from an IP camera (IP
 | `whiteList` | Allow list | Plate is on the camera's allow list |
 | `blackList` | Block list | Plate is on the camera's block list |
 | `temporaryList` | Temporary vehicle | Plate is on the temporary list and within its valid date range |
+| `strangerList` | — | Plate is on the stranger list |
 | `Unknown` | — | Plate is not in the camera's database, or is a temporary plate outside its date range |
 
 **NVR** — user-defined plate group names:
@@ -54,13 +55,30 @@ The NVR lets you create custom plate groups (e.g., "Whitelist", "Residents", "De
 
 These are the inputs your Home Assistant automations use. For example, when Status changes to `whiteList` or `temporaryList` (IPC) or your group name (NVR), open the gate. When it changes to `Unknown`, send a notification.
 
+Plate events also publish these attributes on the **License Plate** and **Status** sensors. Webhook automations see the same values on `trigger.json`. Entity names and MQTT topics are unchanged. `timestamp` is the camera's event time.
+
+| Attribute | Values | Example |
+|-----------|--------|---------|
+| `direction` | `approach`, `away`, or null | `approach` |
+| `confidence` | Detection score from 0 to 100 | `99.0` |
+| `plate_list` | `whiteList`, `blackList`, `temporaryList`, `strangerList`, or null | `whiteList` |
+| `vehicle_color` | Vehicle color, when the camera sends it | `grey` |
+| `vehicle_brand` | Vehicle brand, when the camera sends it | `Tesla` |
+| `vehicle_type` | Vehicle type, when the camera sends it | `saloon car` |
+| `vehicle_model` | Vehicle model, when the camera sends it | `Tesla_ModelS` |
+| `timestamp` | Camera event time | `2026-10-07 21:24:47.427999` |
+
+`plate_status` is still the raw group: an IP camera reports `whiteList`, `blackList`, `temporaryList`, or `strangerList`, and an NVR reports the group name you created. `plate_list` is set only when that group is one of those four lists. A custom NVR group such as `Residents` stays on `plate_status`, and `plate_list` is null. A camera direction of `leave` is published as `away`. The bridge log still prints the plate and the lowercased list, for example `AIDRIVE (blacklist)`.
+
+NVR events that include a brand also keep the nested `vehicle` object (`vehicle.brand`, `vehicle.color`, `vehicle.type`, `vehicle.model`) and `plate_color`. The `vehicle_*` attributes above are set for both IP cameras and NVRs. These fields require viewtron 1.4.0 or newer.
+
 The plate database is managed directly on the camera or NVR — add, remove, and organize plates through the web interface. See [License Plate Database Setup](#3-license-plate-database-setup-optional) below for instructions.
 
 ## Supported Detection Types
 
 | Detection | HA Entity | Status |
 |-----------|-----------|--------|
-| **License Plate Recognition (LPR)** | `sensor.viewtron_*_license_plate`, `sensor.viewtron_*_status` | **Tested and supported** — plate number, plate group (allow list, block list, etc.), vehicle brand/color/type |
+| **License Plate Recognition (LPR)** | `sensor.viewtron_*_license_plate`, `sensor.viewtron_*_status` | **Tested and supported** — plate number, plate group (allow list, block list, etc.), direction, confidence, vehicle color/brand/type/model |
 | **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Coming soon — zone entry, exit, line crossing, loitering, intrusion detection |
 | **Face Detection** | `binary_sensor.viewtron_*_face_detected` | Coming soon — face recognition with NVR database |
 | **Object Counting** | `sensor.viewtron_*_object_count` | Coming soon — people/vehicle count by line or area |
@@ -295,7 +313,7 @@ Viewtron AI cameras run detection on-device (ALPR, face detection, human/vehicle
 4. Publishes to MQTT with HA auto-discovery config
 5. Optionally forwards to HA webhook triggers
 
-The bridge handles both **IP Camera direct (v1.x)** and **NVR forwarded (v2.0)** event formats automatically.
+The bridge handles both **IP Camera direct (v1.x)** and **NVR forwarded (v2.0)** event formats automatically. The `timestamp` on each event is the camera's event time.
 
 ## Example Automations
 
@@ -340,6 +358,49 @@ See [`example_automations.yaml`](example_automations.yaml) for ready-to-use HA a
 ```
 
 Swap `viewtron_ipc` for your own camera's entity ID prefix (see [What Home Assistant Receives](#what-home-assistant-receives)). A plain `to: "Unknown"` trigger only fires when the status changes, so it would miss the second of two unknown vehicles in a row.
+
+**Open a gate for an approaching allow-list plate (MQTT):**
+
+The gate opens only when the plate is on the allow list, the vehicle is approaching, and the read is at least 90% confident. Triggering on the `timestamp` attribute runs once per plate read.
+
+```yaml
+- alias: "Open gate for an approaching allow-list plate"
+  trigger:
+    - platform: state
+      entity_id: sensor.viewtron_ipc_status
+      attribute: timestamp
+  condition:
+    - condition: template
+      value_template: >-
+        {{ state_attr('sensor.viewtron_ipc_status', 'plate_list') == 'whiteList'
+           and state_attr('sensor.viewtron_ipc_status', 'direction') == 'approach'
+           and state_attr('sensor.viewtron_ipc_status', 'confidence') | float(0) >= 90 }}
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.gate_opener
+```
+
+**Block-list plate alert (MQTT):**
+
+```yaml
+- alias: "Alert on a block-list plate"
+  trigger:
+    - platform: state
+      entity_id: sensor.viewtron_ipc_status
+      attribute: timestamp
+  condition:
+    - condition: template
+      value_template: >-
+        {{ state_attr('sensor.viewtron_ipc_status', 'plate_list') == 'blackList' }}
+  action:
+    - service: notify.mobile_app_phone
+      data:
+        title: "Block-list plate"
+        message: "Plate {{ states('sensor.viewtron_ipc_license_plate') }} is on the block list"
+```
+
+Webhook automations use `trigger.json.plate_list`, `trigger.json.direction`, and `trigger.json.confidence` the same way. See [`example_automations.yaml`](example_automations.yaml).
 
 ## Compatible Cameras
 

@@ -3,3 +3,4 @@ __pycache__/
 /config.yaml
 images/
 venv/
+.venv/
