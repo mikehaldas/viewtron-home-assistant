@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- License plate events now include `direction` (`approach` or `away`),
+  `confidence` (0–100), `plate_list` (`whiteList`, `blackList`,
+  `temporaryList`, `strangerList`, or empty), and `vehicle_color`,
+  `vehicle_brand`, `vehicle_type`, and `vehicle_model`. Existing entity
+  names, MQTT topics, and attributes are unchanged, including the plate
+  group on the Status sensor and the console label such as
+  `AIDRIVE (blacklist)`.
+- The event `timestamp` is the camera's event time. viewtron 1.4.0 reads
+  `currentTime` as seconds, milliseconds, or microseconds.
+- Require viewtron 1.4.0 or newer.
+
 ## 1.1.1
 
 - License plate events from an IP camera reach Home Assistant when the

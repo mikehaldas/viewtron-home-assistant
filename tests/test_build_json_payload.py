@@ -1,5 +1,6 @@
 """Plate status in build_json_payload, including viewtron 1.3.0 IP cameras."""
 
+import json
 import sys
 import types
 import unittest
@@ -23,7 +24,7 @@ _stub("requests")
 _stub("yaml", safe_load=lambda *args, **kwargs: {})
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "viewtron-bridge"))
-from viewtron_bridge import build_json_payload  # noqa: E402
+from viewtron_bridge import build_json_payload, format_plate_label  # noqa: E402
 
 
 class Event:
@@ -89,6 +90,56 @@ class BuildJsonPayloadLprTests(unittest.TestCase):
         payload = build_json_payload(event, "PEA", "192.0.2.10")
         self.assertNotIn("plate_number", payload)
         self.assertNotIn("plate_status", payload)
+        for key in (
+            "direction", "confidence", "plate_list",
+            "vehicle_color", "vehicle_brand", "vehicle_type", "vehicle_model",
+        ):
+            self.assertNotIn(key, payload)
+
+    def test_missing_sdk_attributes_are_null(self):
+        event = Event(get_plate_group=lambda: "whiteList")
+        payload = build_json_payload(event, "VEHICE", "192.0.2.10")
+        for key in (
+            "direction", "confidence", "plate_list",
+            "vehicle_color", "vehicle_brand", "vehicle_type", "vehicle_model",
+        ):
+            self.assertIsNone(payload[key])
+        self.assertIn('"direction": null', json.dumps(payload))
+        self.assertEqual(format_plate_label(payload), "ABC1234 (whitelist)")
+
+    def test_nvr_attributes_sit_beside_the_vehicle_object(self):
+        event = Event(
+            get_plate_group=lambda: "Residents",
+            get_car_brand=lambda: "GMC",
+            get_car_type=lambda: "mpv",
+            get_car_color=lambda: "white",
+            get_car_model=lambda: "GMC_SAVANA",
+            get_plate_color=lambda: "blue",
+        )
+        event.direction = "approach"
+        event.confidence = 90.0
+        event.plate_list = None
+        event.vehicle_color = "white"
+        event.vehicle_brand = "GMC"
+        event.vehicle_type = "mpv"
+        event.vehicle_model = "GMC_SAVANA"
+        payload = build_json_payload(event, "vehicle", "192.0.2.10")
+        self.assertEqual(payload["plate_status"], "Residents")
+        self.assertIsNone(payload["plate_list"])
+        self.assertEqual(payload["direction"], "approach")
+        self.assertEqual(payload["confidence"], 90.0)
+        self.assertEqual(payload["vehicle_color"], "white")
+        self.assertEqual(payload["vehicle_brand"], "GMC")
+        self.assertEqual(payload["vehicle_type"], "mpv")
+        self.assertEqual(payload["vehicle_model"], "GMC_SAVANA")
+        self.assertEqual(payload["vehicle"], {
+            "type": "mpv",
+            "color": "white",
+            "brand": "GMC",
+            "model": "GMC_SAVANA",
+        })
+        self.assertEqual(payload["plate_color"], "blue")
+        self.assertEqual(format_plate_label(payload), "ABC1234 (residents)")
 
 
 if __name__ == "__main__":

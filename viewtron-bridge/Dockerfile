@@ -4,8 +4,12 @@
 # Pinning the base keeps the add-on build and a plain `docker build` identical.
 FROM python:3.12-alpine
 
+# viewtron 1.4.0 adds plate direction, confidence, list, and vehicle
+# attributes, and reports the camera's event time. Pass VIEWTRON_SPEC when
+# that release is not on PyPI yet.
+ARG VIEWTRON_SPEC="viewtron>=1.4.0"
 RUN pip3 install --no-cache-dir --break-system-packages \
-    "viewtron>=1.3.1" "paho-mqtt>=2.0" requests pyyaml
+    "${VIEWTRON_SPEC}" "paho-mqtt>=2.0" requests pyyaml
 
 COPY run.sh /
 COPY viewtron_bridge.py /
