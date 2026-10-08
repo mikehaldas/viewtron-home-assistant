@@ -14,7 +14,9 @@
 # HA receives events as:
 #   MQTT:    sensor.viewtron_<camera>_license_plate, sensor.viewtron_<camera>_status,
 #            binary_sensor.viewtron_<camera>_intrusion, sensor.viewtron_<camera>_object_count, etc.
-#   Webhook: trigger.json.plate_number, trigger.json.plate_status, etc.
+#   Webhook: trigger.json.plate_number, trigger.json.plate_status,
+#            trigger.json.plate_list, trigger.json.direction,
+#            trigger.json.confidence, trigger.json.vehicle_brand, etc.
 
 # Port this bridge listens on (configure your camera to send HTTP Posts here)
 bridge_port: 5002

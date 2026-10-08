@@ -15,19 +15,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install test dependencies
+        run: |
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --upgrade pip
+          /tmp/venv/bin/pip install "paho-mqtt>=2.0" "PyYAML>=6.0" "requests>=2.28"
+          SPEC="viewtron>=1.4.0"
+          if ! /tmp/venv/bin/python - <<'PY'
+          import json, urllib.request
+          releases = json.load(urllib.request.urlopen("https://pypi.org/pypi/viewtron/json"))["releases"]
+          raise SystemExit(0 if releases.get("1.4.0") else 1)
+          PY
+          then
+            # 1.4.0 is not on PyPI yet. Install the unreleased branch.
+            SPEC="viewtron @ https://github.com/mikehaldas/viewtron-python-sdk/archive/refs/heads/cursor/api-2.1-sdk-1.4.0-9bcc.zip"
+          fi
+          /tmp/venv/bin/pip install "$SPEC"
+          {
+            echo "VIEWTRON_SPEC<<EOF"
+            echo "$SPEC"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Unit tests
-        run: python3 -m unittest discover -s tests -v
+        run: /tmp/venv/bin/python -m unittest discover -s tests -v
 
       - name: Build image
-        run: docker build -t viewtron-bridge:test viewtron-bridge
+        run: docker build -t viewtron-bridge:test --build-arg "VIEWTRON_SPEC=${VIEWTRON_SPEC}" viewtron-bridge
 
       - name: Build the way older Home Assistant Supervisors do
         # Older Supervisors pass BUILD_FROM with a base image that has no
         # Python. The Dockerfile must ignore it and still build.
-        run: >
-          docker build -t viewtron-bridge:addon
-          --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
-          viewtron-bridge
+        run: |
+          docker build -t viewtron-bridge:addon \
+            --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest \
+            --build-arg "VIEWTRON_SPEC=${VIEWTRON_SPEC}" \
+            viewtron-bridge
 
       - name: Start MQTT broker
         run: |

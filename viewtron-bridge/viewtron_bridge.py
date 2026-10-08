@@ -540,6 +540,8 @@ def build_json_payload(vt_event, alarm_type, client_ip):
         "event_description": vt_event.get_alarm_description(),
         "camera_name": vt_event.get_ip_cam(),
         "camera_ip": client_ip,
+        # Camera event time. viewtron 1.4.0 reads currentTime as seconds,
+        # milliseconds, or microseconds.
         "timestamp": vt_event.get_time_stamp_formatted(),
     }
 
@@ -550,7 +552,9 @@ def build_json_payload(vt_event, alarm_type, client_ip):
     if target_type:
         payload["target_type"] = target_type
 
-    # LPR fields
+    # LPR fields. plate_status stays the raw group from the camera or NVR.
+    # viewtron 1.4.0 also sets direction, confidence, plate_list, and the
+    # vehicle_* attributes; those are published beside the existing fields.
     if alarm_type in ("VEHICE", "VEHICLE", "vehicle"):
         payload["plate_number"] = vt_event.get_plate_number()
 
@@ -563,6 +567,7 @@ def build_json_payload(vt_event, alarm_type, client_ip):
             get_group = getattr(vt_event, "get_vehicle_list_type", None)
         plate_group = get_group() if get_group else None
         payload["plate_status"] = plate_group if plate_group else "Unknown"
+        payload.update(lpr_attribute_fields(vt_event))
 
         if hasattr(vt_event, "get_car_brand"):
             car_brand = vt_event.get_car_brand()
@@ -596,6 +601,36 @@ def build_json_payload(vt_event, alarm_type, client_ip):
         payload["zone_action"] = "loiter"
 
     return payload
+
+
+# Attribute names match viewtron 1.4.0 LPR / VehicleLPR. Missing values are
+# null so the MQTT attribute set stays the same on every plate event.
+_LPR_ATTRIBUTE_FIELDS = (
+    "direction",
+    "confidence",
+    "plate_list",
+    "vehicle_color",
+    "vehicle_brand",
+    "vehicle_type",
+    "vehicle_model",
+)
+
+
+def lpr_attribute_fields(vt_event):
+    """Direction, confidence, plate list, and vehicle attributes.
+
+    ``direction`` is ``approach``, ``away``, or None. ``confidence`` is a
+    0–100 float or None. ``plate_list`` is ``whiteList``, ``blackList``,
+    ``temporaryList``, ``strangerList``, or None.
+    """
+    return {name: getattr(vt_event, name, None) for name in _LPR_ATTRIBUTE_FIELDS}
+
+
+def format_plate_label(payload):
+    """Console label for a plate event, e.g. ``IB36NL (whitelist)``."""
+    plate = payload["plate_number"]
+    status = payload.get("plate_status", "Unknown").lower()
+    return f"{plate} ({status})"
 
 
 def save_event_images(vt_event, alarm_type, timestamp_str):
@@ -721,9 +756,7 @@ def make_event_handler(config, mqtt_bridge):
         desc = payload["event_description"]
         extra = ""
         if "plate_number" in payload:
-            plate = payload["plate_number"]
-            status = payload.get("plate_status", "Unknown").lower()
-            extra = f" | {plate} ({status})"
+            extra = f" | {format_plate_label(payload)}"
         elif "face" in payload:
             face = payload["face"]
             extra = f" | {face['age']} {face['sex']}"

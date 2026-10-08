@@ -44,6 +44,7 @@ The **Status** sensor value depends on whether events come from an IP camera (IP
 | `whiteList` | Allow list | Plate is on the camera's allow list |
 | `blackList` | Block list | Plate is on the camera's block list |
 | `temporaryList` | Temporary vehicle | Plate is on the temporary list and within its valid date range |
+| `strangerList` | — | Plate is reported on the stranger list |
 | `Unknown` | — | Plate is not in the camera's database, or is a temporary plate outside its date range |
 
 **NVR** — user-defined plate group names:
@@ -54,13 +55,34 @@ The NVR lets you create custom plate groups (e.g., "Whitelist", "Residents", "De
 
 These are the inputs your Home Assistant automations use. For example, when Status changes to `whiteList` or `temporaryList` (IPC) or your group name (NVR), open the gate. When it changes to `Unknown`, send a notification.
 
+Direction, confidence, the normalized plate list, and vehicle details are attributes on the License Plate and Status sensors (the same JSON the webhook receives as `trigger.json`). See [Plate event attributes](#plate-event-attributes).
+
+### Plate event attributes
+
+Entity names and MQTT topics are unchanged. A plate event's JSON includes the fields below. A value the camera does not send is `none`.
+
+| Attribute | Example | Meaning |
+|-----------|---------|---------|
+| `timestamp` | `2026-10-07 17:24:47.427999` | The camera's event time, in the local time of the machine running the bridge. A fractional second is included when the camera sends one. |
+| `plate_list` | `whiteList` | `whiteList` (allow list), `blackList` (block list), `temporaryList`, `strangerList`, or none. An NVR group is copied here only when its name is one of those lists, ignoring capitalization. A custom name such as `Residents` stays on Status (`plate_status`) and this attribute is none. |
+| `direction` | `approach` | `approach` or `away`. None when the camera does not send a direction. A camera value of `leave` is reported as `away`. |
+| `confidence` | `99.0` | Detection confidence from 0 to 100. None when the camera does not send one. |
+| `vehicle_color` | `white` | Vehicle color, when the camera sends it |
+| `vehicle_brand` | `TestBrand` | Vehicle brand, when the camera sends it |
+| `vehicle_type` | `saloon car` | Vehicle type, when the camera sends it |
+| `vehicle_model` | `TestModel` | Vehicle model, when the camera sends it |
+
+`plate_status` is still the raw group name described above (`whiteList`, `blackList`, `temporaryList`, `strangerList`, an NVR group name, or `Unknown`). The console log still prints that group in lowercase parentheses, for example `IB36NL (whitelist)`.
+
+NVR plate events that include a vehicle brand also still include `vehicle.brand`, `vehicle.color`, `vehicle.type`, `vehicle.model`, and `plate_color`.
+
 The plate database is managed directly on the camera or NVR — add, remove, and organize plates through the web interface. See [License Plate Database Setup](#3-license-plate-database-setup-optional) below for instructions.
 
 ## Supported Detection Types
 
 | Detection | HA Entity | Status |
 |-----------|-----------|--------|
-| **License Plate Recognition (LPR)** | `sensor.viewtron_*_license_plate`, `sensor.viewtron_*_status` | **Tested and supported** — plate number, plate group (allow list, block list, etc.), vehicle brand/color/type |
+| **License Plate Recognition (LPR)** | `sensor.viewtron_*_license_plate`, `sensor.viewtron_*_status` | **Tested and supported** — plate number, plate group (allow list, block list, etc.), direction, confidence, and vehicle color/brand/type/model |
 | **Person Detection/Vehicle Detection** | `binary_sensor.viewtron_*_intrusion` | Coming soon — zone entry, exit, line crossing, loitering, intrusion detection |
 | **Face Detection** | `binary_sensor.viewtron_*_face_detected` | Coming soon — face recognition with NVR database |
 | **Object Counting** | `sensor.viewtron_*_object_count` | Coming soon — people/vehicle count by line or area |
@@ -340,6 +362,49 @@ See [`example_automations.yaml`](example_automations.yaml) for ready-to-use HA a
 ```
 
 Swap `viewtron_ipc` for your own camera's entity ID prefix (see [What Home Assistant Receives](#what-home-assistant-receives)). A plain `to: "Unknown"` trigger only fires when the status changes, so it would miss the second of two unknown vehicles in a row.
+
+**Open a gate for an approaching allow-list plate (webhook):**
+
+```yaml
+- alias: "Open the gate for an approaching allow-list plate"
+  trigger:
+    - platform: webhook
+      webhook_id: viewtron-lpr
+      local_only: true
+  condition:
+    - condition: template
+      value_template: >-
+        {{ trigger.json.plate_list == 'whiteList'
+           and trigger.json.direction == 'approach'
+           and trigger.json.confidence | float(0) >= 90 }}
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.gate
+```
+
+The gate opens only when the plate is on the allow list, the vehicle is approaching, and confidence is at least 90. Match a custom NVR group with `plate_status` instead of `plate_list`.
+
+**Block-list plate alert (MQTT sensor):**
+
+```yaml
+- alias: "Alert on a block-list plate"
+  trigger:
+    - platform: state
+      entity_id: sensor.viewtron_ipc_license_plate
+      attribute: timestamp
+  condition:
+    - condition: template
+      value_template: "{{ state_attr('sensor.viewtron_ipc_license_plate', 'plate_list') == 'blackList' }}"
+  action:
+    - service: notify.mobile_app_phone
+      data:
+        title: "Block-list plate"
+        message: >-
+          Plate {{ states('sensor.viewtron_ipc_license_plate') }}
+          ({{ state_attr('sensor.viewtron_ipc_license_plate', 'direction') }},
+          confidence {{ state_attr('sensor.viewtron_ipc_license_plate', 'confidence') }})
+```
 
 ## Compatible Cameras
 
