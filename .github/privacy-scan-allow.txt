@@ -1,0 +1,3 @@
+# Documented example ranges ignored by the private-address rule.
+# One IPv4 address or one network prefix per line.
+# This file starts with no entries.

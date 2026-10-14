@@ -430,6 +430,22 @@ Product page: [www.Viewtron.com](https://www.Viewtron.com)
 - **[Node-RED Integration](https://videos.cctvcamerapros.com/developer/docs/integrations/node-red/)** — Direct camera-to-Node-RED with no middleware
 - **[LPR Application Guide](https://videos.cctvcamerapros.com/developer/docs/applications/license-plate-recognition-camera-api/)** — Webhook formats, plate database API, code examples
 
+## Privacy scan
+
+Every pull request runs [`.github/workflows/privacy-scan.yml`](.github/workflows/privacy-scan.yml) for all branches. The job runs [`.github/scripts/privacy_scan.py`](.github/scripts/privacy_scan.py) with the Python 3 standard library.
+
+The scan reads added lines from `git diff base...head`, the pull request title and body from the GitHub event payload, and commit messages from `git log`. A failure lists `file:line` and the rule name. A confidential-term hit is shown as `[confidential term]`; the matched text is not logged.
+
+1. **Confidential terms.** The `PRIVACY_SCAN_TERMS` secret is one SHA-256 hex digest per line, the hash of a lowercase term. The scanner hashes lowercase word n-grams of one to three words, including the form with spaces, hyphens, and underscores removed. Do not commit plaintext terms. If the secret is unset, as on a fork pull request, the check warns and skips only this rule. Build the secret locally with [`scripts/hash_terms.py`](scripts/hash_terms.py), which reads one term per line on stdin and prints digests:
+
+   ```bash
+   python scripts/hash_terms.py < terms.txt
+   ```
+
+2. **Private addresses.** Dotted addresses in 10/8, 172.16/12, 192.168/16, and 169.254/16. Documented examples listed in [`.github/privacy-scan-allow.txt`](.github/privacy-scan-allow.txt) are ignored. That file starts with no entries.
+
+3. **License plates.** A hit is a digest from `PRIVACY_SCAN_PLATES`, a value in a plate field, or a quoted token of 4 to 8 uppercase letters and digits that contains a letter and a digit on a line that mentions plate, lpr, anpr, or the phrase license plate. Plate fields are XML tags such as plateNumber, plate, carPlate, and licensePlateNumber, and JSON or Python keys or keyword arguments named plate, plate_number, plateNumber, or license_plate. Common tech tokens, model names with an ip-, lpr-, or nvr- prefix, and hex or uuid-like strings are ignored. `PRIVACY_SCAN_PLATES` uses the same digest format; a missing secret skips only that digest check. Entries in [`.github/privacy-scan-plates-approved.txt`](.github/privacy-scan-plates-approved.txt) pass. Mike must approve each entry. The fake test plate IB36NL was approved by Mike on 2026-10-14.
+
 ## Author
 
 Mike Haldas — [CCTV Camera Pros](https://www.cctvcamerapros.com)
