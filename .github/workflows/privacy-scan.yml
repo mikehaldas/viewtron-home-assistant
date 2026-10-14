@@ -1,0 +1,42 @@
+# Fail a pull request when added lines, the title, the body, or commit
+# messages trip the privacy scan. Fork pull requests do not receive
+# repository secrets; the term and hashed-plate checks warn and skip.
+name: Privacy scan
+
+on:
+  pull_request:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+jobs:
+  privacy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch pull request base and head
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git cat-file -e "${BASE_SHA}^{commit}" || git fetch --no-tags origin "$BASE_SHA"
+          git cat-file -e "${HEAD_SHA}^{commit}" || git fetch --no-tags origin "pull/${PR_NUMBER}/head"
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+
+      - name: Run privacy scan
+        env:
+          PRIVACY_SCAN_TERMS: ${{ secrets.PRIVACY_SCAN_TERMS }}
+          PRIVACY_SCAN_PLATES: ${{ secrets.PRIVACY_SCAN_PLATES }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 .github/scripts/privacy_scan.py --base "$BASE_SHA" --head "$HEAD_SHA"
