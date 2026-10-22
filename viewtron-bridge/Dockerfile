@@ -4,6 +4,11 @@
 # Pinning the base keeps the add-on build and a plain `docker build` identical.
 FROM python:3.12-alpine
 
+# GHSA-6q48-6c7w-9gw2: patched pip and certifi, before application packages.
+# The base image marks its Python as externally managed, same as the install below.
+RUN pip3 install --no-cache-dir --break-system-packages --upgrade \
+    pip==26.2.2 'certifi>=2026.10.19'
+
 # viewtron 1.4.0 adds plate direction, confidence, list, and vehicle
 # attributes, and reports the camera's event time. Pass VIEWTRON_SPEC when
 # that release is not on PyPI yet.
