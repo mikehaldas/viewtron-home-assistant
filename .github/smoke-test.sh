@@ -6,15 +6,17 @@ set -euo pipefail
 PORT="$1"
 NAME="$2"
 SRC_IP="$3"
-CAMERA_ID="${SRC_IP//./_}"
-SAMPLE_URL="https://raw.githubusercontent.com/mikehaldas/IP-Camera-API/main/examples/ipc-v1x/lpr.xml"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# This fixture names the camera LPR-TEST, so the topic includes that name.
+# A downloaded example is not pinned, and after it gained a camera name the
+# subscriber waited on the address-only topic until the client timed out.
+SAMPLE="${ROOT}/tests/fixtures/ipc-v2.1/plate-ib36nl.xml"
+CAMERA_ID="lpr_test_${SRC_IP//./_}"
 
 for _ in $(seq 1 30); do
   (echo > "/dev/tcp/127.0.0.1/${PORT}") 2>/dev/null && break
   sleep 1
 done
-
-curl -sfL -o /tmp/lpr.xml "$SAMPLE_URL"
 
 # -R skips retained messages, so only a fresh publish counts
 docker exec mqtt mosquitto_sub -R -t "viewtron/${CAMERA_ID}/lpr" -C 1 -W 30 \
@@ -22,18 +24,17 @@ docker exec mqtt mosquitto_sub -R -t "viewtron/${CAMERA_ID}/lpr" -C 1 -W 30 \
 SUB=$!
 sleep 1
 curl -sf -m 10 --interface "$SRC_IP" -X POST -H 'Content-Type: application/xml' \
-  --data-binary @/tmp/lpr.xml "http://127.0.0.1:${PORT}/API" > /dev/null
+  --data-binary @"$SAMPLE" "http://127.0.0.1:${PORT}/API" > /dev/null
 wait "$SUB"
 
 echo "State: $(cat "/tmp/${NAME}-state.json")"
-grep -q '"plate_number": "ABC1234"' "/tmp/${NAME}-state.json"
+grep -q '"plate_number": "IB36NL"' "/tmp/${NAME}-state.json"
 
 docker exec mqtt mosquitto_sub -t "homeassistant/sensor/${CAMERA_ID}/plate/config" -C 1 -W 5 \
   | grep -q "\"unique_id\": \"viewtron_${CAMERA_ID}_plate\""
 
 # Sanitized IPC plate post. The device name is "LPR-TEST", so the topic
 # includes that name and the source address.
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FIXTURE_IP="127.0.0.4"
 FIXTURE_ID="lpr_test_${FIXTURE_IP//./_}"
 FIXTURE_STATE="/tmp/${NAME}-ib36nl.json"
