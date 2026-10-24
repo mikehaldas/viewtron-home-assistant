@@ -297,7 +297,7 @@ Click **Edit**, then **Add** and configure the server connection:
 | **Target picture** | **Checked** — cropped target image (appears as Plate in HA) |
 | **Smart Alarm Type** | Select the detection types you want (e.g., License Plate Detection) |
 
-Click **Save**. The camera must be rebooted after initial HTTP POST configuration changes.
+Click **Save**.
 
 Detailed setup guide: [LPR Camera API Setup](https://videos.cctvcamerapros.com/v/lpr-camera-api.html)
 
